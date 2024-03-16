@@ -320,6 +320,21 @@ impl Application for GUI {
         }
     }
 
+    fn theme(&self) -> Self::Theme {
+        if let Ok(mut th) = std::env::var("LIANA_THEME") {
+            th = th.to_lowercase();
+            if th == "light" {
+                theme::Theme::Light
+            } else if th == "test" {
+                theme::Theme::Test
+            } else {
+                theme::Theme::Dark
+            }
+        } else {
+            theme::Theme::Dark
+        }
+    }
+
     fn scale_factor(&self) -> f64 {
         1.0
     }

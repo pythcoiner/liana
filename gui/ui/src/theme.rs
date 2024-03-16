@@ -13,6 +13,7 @@ pub enum Theme {
     #[default]
     Dark,
     Light,
+    Test,
 }
 
 impl application::StyleSheet for Theme {
@@ -24,7 +25,7 @@ impl application::StyleSheet for Theme {
                 background_color: color::GREY_2,
                 text_color: color::LIGHT_BLACK,
             },
-            Theme::Dark => application::Appearance {
+            Theme::Dark | Theme::Test => application::Appearance {
                 background_color: color::LIGHT_BLACK,
                 text_color: color::WHITE,
             },
@@ -143,7 +144,7 @@ impl container::StyleSheet for Theme {
                     ..container::Appearance::default()
                 },
             },
-            Theme::Dark => match style {
+            Theme::Dark | Theme::Test => match style {
                 Container::Transparent => container::Appearance {
                     background: Some(iced::Color::TRANSPARENT.into()),
                     ..container::Appearance::default()
@@ -237,7 +238,7 @@ impl Notification {
                     ..container::Appearance::default()
                 },
             },
-            Theme::Dark => match self {
+            Theme::Dark | Theme::Test => match self {
                 Self::Pending => container::Appearance {
                     background: Some(iced::Background::Color(color::GREEN)),
                     text_color: color::LIGHT_BLACK.into(),
@@ -316,7 +317,7 @@ impl Card {
                     ..container::Appearance::default()
                 },
             },
-            Theme::Dark => match self {
+            Theme::Dark | Theme::Test => match self {
                 Card::Simple => container::Appearance {
                     background: Some(color::GREY_6.into()),
                     border: iced::Border {
@@ -623,7 +624,7 @@ impl button::StyleSheet for Theme {
     fn active(&self, style: &Self::Style) -> button::Appearance {
         match self {
             Theme::Light => button::Appearance::default(),
-            Theme::Dark => match style {
+            Theme::Dark | Theme::Test => match style {
                 Button::Primary => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(iced::Color::TRANSPARENT.into()),
@@ -715,7 +716,7 @@ impl button::StyleSheet for Theme {
     fn hovered(&self, style: &Self::Style) -> button::Appearance {
         match self {
             Theme::Light => button::Appearance::default(),
-            Theme::Dark => match style {
+            Theme::Dark | Theme::Test => match style {
                 Button::Primary => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(color::GREEN.into()),
