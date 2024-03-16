@@ -1,9 +1,11 @@
+use iced::widget::button::Appearance;
 use iced::{
     application,
     widget::{
         button, checkbox, container, pick_list, progress_bar, qr_code, radio, scrollable, slider,
         svg, text, text_input,
     },
+    Background, Color, Vector,
 };
 
 use super::color;
@@ -575,6 +577,10 @@ impl checkbox::StyleSheet for Theme {
     type Style = CheckBox;
 
     fn active(&self, _style: &Self::Style, is_selected: bool) -> checkbox::Appearance {
+        let _text_color = match self {
+            Theme::Test => Some(color::TEST_CHECKBOX_LABEL),
+            _ => None,
+        };
         if is_selected {
             checkbox::Appearance {
                 background: color::GREEN.into(),
@@ -628,7 +634,13 @@ impl button::StyleSheet for Theme {
                 Button::Primary => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(iced::Color::TRANSPARENT.into()),
-                    text_color: color::GREY_2,
+                    text_color: {
+                        if self == &Theme::Test {
+                            color::TEST_PRIMARY_BUTTON
+                        } else {
+                            color::GREY_2
+                        }
+                    },
                     border: iced::Border {
                         color: color::GREY_7,
                         width: 1.0,
@@ -640,7 +652,13 @@ impl button::StyleSheet for Theme {
                     button::Appearance {
                         shadow_offset: iced::Vector::default(),
                         background: Some(iced::Color::TRANSPARENT.into()),
-                        text_color: color::GREY_2,
+                        text_color: {
+                            if self == &Theme::Test {
+                                color::TEST_SECONDARY_BUTTON
+                            } else {
+                                color::GREY_2
+                            }
+                        },
                         border: iced::Border {
                             color: color::GREY_7,
                             width: 1.0,
@@ -674,7 +692,13 @@ impl button::StyleSheet for Theme {
                 Button::TransparentBorder => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(iced::Color::TRANSPARENT.into()),
-                    text_color: color::WHITE,
+                    text_color: {
+                        if self == &Theme::Test {
+                            color::TEST_SETTING_SECTION
+                        } else {
+                            color::WHITE
+                        }
+                    },
                     border: iced::Border {
                         color: color::TRANSPARENT,
                         width: 0.0,
@@ -687,7 +711,13 @@ impl button::StyleSheet for Theme {
                         button::Appearance {
                             shadow_offset: iced::Vector::default(),
                             background: Some(color::LIGHT_BLACK.into()),
-                            text_color: color::WHITE,
+                            text_color: {
+                                if self == &Theme::Test {
+                                    color::TEST_MENU_BUTTON_SELECTED
+                                } else {
+                                    color::WHITE
+                                }
+                            },
                             border: iced::Border {
                                 color: color::TRANSPARENT,
                                 width: 0.0,
@@ -699,7 +729,13 @@ impl button::StyleSheet for Theme {
                         button::Appearance {
                             shadow_offset: iced::Vector::default(),
                             background: Some(iced::Color::TRANSPARENT.into()),
-                            text_color: color::WHITE,
+                            text_color: {
+                                if self == &Theme::Test {
+                                    color::TEST_MENU_BUTTON
+                                } else {
+                                    color::WHITE
+                                }
+                            },
                             border: iced::Border {
                                 color: color::TRANSPARENT,
                                 width: 0.0,
@@ -720,7 +756,14 @@ impl button::StyleSheet for Theme {
                 Button::Primary => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(color::GREEN.into()),
-                    text_color: color::LIGHT_BLACK,
+                    text_color: {
+                        if self == &Theme::Test {
+                            color::TEST_PRIMARY_BUTTON
+                        } else {
+                            color::LIGHT_BLACK
+                        }
+                    },
+
                     border: iced::Border {
                         color: color::TRANSPARENT,
                         width: 0.0,
@@ -731,7 +774,14 @@ impl button::StyleSheet for Theme {
                 Button::Secondary => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(color::GREEN.into()),
-                    text_color: color::LIGHT_BLACK,
+                    text_color: {
+                        if self == &Theme::Test {
+                            color::TEST_SECONDARY_BUTTON
+                        } else {
+                            color::LIGHT_BLACK
+                        }
+                    },
+
                     border: iced::Border {
                         color: color::TRANSPARENT,
                         width: 0.0,
@@ -764,7 +814,14 @@ impl button::StyleSheet for Theme {
                 Button::TransparentBorder | Button::Border => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(iced::Color::TRANSPARENT.into()),
-                    text_color: color::WHITE,
+                    text_color: {
+                        if self == &Theme::Test {
+                            color::TEST_SETTING_SECTION
+                        } else {
+                            color::WHITE
+                        }
+                    },
+
                     border: iced::Border {
                         color: color::GREEN,
                         width: 1.0,
@@ -775,7 +832,14 @@ impl button::StyleSheet for Theme {
                 Button::Menu(_) => button::Appearance {
                     shadow_offset: iced::Vector::default(),
                     background: Some(color::LIGHT_BLACK.into()),
-                    text_color: color::WHITE,
+                    text_color: {
+                        if self == &Theme::Test {
+                            color::TEST_MENU_BUTTON_SELECTED
+                        } else {
+                            color::WHITE
+                        }
+                    },
+
                     border: iced::Border {
                         color: color::TRANSPARENT,
                         width: 0.0,
@@ -784,6 +848,44 @@ impl button::StyleSheet for Theme {
                     ..button::Appearance::default()
                 },
             },
+        }
+    }
+
+    fn disabled(&self, style: &Self::Style) -> Appearance {
+        let color = if self == &Theme::Test {
+            match style {
+                Button::Primary => Some(color::TEST_PRIMARY_BUTTON_DISABLED),
+                Button::Secondary => Some(color::TEST_SECONDARY_BUTTON_DISABLED),
+                Button::Menu(_) => Some(color::TEST_MENU_BUTTON),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        let active = self.active(style);
+
+        let color = if let Some(c) = color {
+            c
+        } else {
+            Color {
+                a: active.text_color.a * 0.5,
+                ..active.text_color
+            }
+        };
+
+        // Default implementation
+        Appearance {
+            shadow_offset: Vector::default(),
+            background: active.background.map(|background| match background {
+                Background::Color(color) => Background::Color(Color {
+                    a: color.a * 0.5,
+                    ..color
+                }),
+                Background::Gradient(color) => Background::Gradient(color),
+            }),
+            text_color: color,
+            ..active
         }
     }
 }
@@ -837,7 +939,10 @@ impl text_input::StyleSheet for Theme {
     }
 
     fn placeholder_color(&self, _style: &Self::Style) -> iced::Color {
-        color::GREY_7
+        match self {
+            Theme::Dark | Theme::Light => color::GREY_7,
+            Theme::Test => color::TEST_TEXT_INPUT_PLACEHOLDER,
+        }
     }
 
     fn value_color(&self, _style: &Self::Style) -> iced::Color {
