@@ -4,7 +4,7 @@ use std::str::FromStr;
 use iced::{
     alignment,
     widget::{radio, scrollable, Space},
-    Alignment, Length,
+    Alignment, Application, Length,
 };
 
 use liana::{
@@ -108,7 +108,7 @@ pub fn list(cache: &Cache) -> Element<Message> {
                             .padding(10)
                             .spacing(20)
                             .align_items(Alignment::Center)
-                            .width(Length::Fill),
+                            .width(Length::Fill)
                     )
                     .width(Length::Fill)
                     .style(theme::Button::TransparentBorder)

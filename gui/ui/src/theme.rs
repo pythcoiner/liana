@@ -577,10 +577,14 @@ impl checkbox::StyleSheet for Theme {
     type Style = CheckBox;
 
     fn active(&self, _style: &Self::Style, is_selected: bool) -> checkbox::Appearance {
-        let _text_color = match self {
-            Theme::Test => Some(color::TEST_CHECKBOX_LABEL),
-            _ => None,
+        let color: Background = if self == &Theme::Test {
+            color::TEST_CHECKBOX_LABEL.into()
+        } else if is_selected {
+            color::GREEN.into()
+        } else {
+            color::GREY_4.into()
         };
+
         if is_selected {
             checkbox::Appearance {
                 background: color::GREEN.into(),
@@ -865,13 +869,16 @@ impl button::StyleSheet for Theme {
 
         let active = self.active(style);
 
-        let color = if let Some(c) = color {
-            c
+        let background: Option<Background> = if let Some(c) = color {
+            Some(Background::Color(c))
         } else {
-            Color {
-                a: active.text_color.a * 0.5,
-                ..active.text_color
-            }
+            active.background.map(|background| match background {
+                Background::Color(color) => Background::Color(Color {
+                    a: color.a * 0.5,
+                    ..color
+                }),
+                Background::Gradient(color) => Background::Gradient(color),
+            })
         };
 
         // Default implementation
@@ -884,7 +891,6 @@ impl button::StyleSheet for Theme {
                 }),
                 Background::Gradient(color) => Background::Gradient(color),
             }),
-            text_color: color,
             ..active
         }
     }
