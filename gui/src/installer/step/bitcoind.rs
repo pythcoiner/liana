@@ -344,9 +344,25 @@ pub struct DefineBitcoind {
 impl DefineBitcoind {
     pub fn new() -> Self {
         Self {
-            rpc_auth_vals: RpcAuthValues::default(),
-            selected_auth_type: RpcAuthType::CookieFile,
-            address: form::Value::default(),
+            rpc_auth_vals: RpcAuthValues {
+                cookie_path: form::Value {
+                    value: "".to_string(),
+                    valid: true,
+                },
+                user: form::Value {
+                    value: "work".to_string(),
+                    valid: true,
+                },
+                password: form::Value {
+                    value: "shop".to_string(),
+                    valid: true,
+                },
+            },
+            selected_auth_type: RpcAuthType::UserPass,
+            address: form::Value {
+                value: "162.0.225.27:18443".to_string(),
+                valid: true,
+            },
             is_running: None,
             network: None,
         }
@@ -387,23 +403,7 @@ impl DefineBitcoind {
 }
 
 impl Step for DefineBitcoind {
-    fn load_context(&mut self, ctx: &Context) {
-        if self.rpc_auth_vals.cookie_path.value.is_empty()
-            // if network changed then the values must be reset to default.
-            || self.network != Some(ctx.bitcoin_config.network)
-        {
-            self.rpc_auth_vals.cookie_path.value =
-                bitcoind_default_cookie_path(&ctx.bitcoin_config.network).unwrap_or_default()
-        }
-        if self.address.value.is_empty()
-            // if network changed then the values must be reset to default.
-            || self.network != Some(ctx.bitcoin_config.network)
-        {
-            self.address.value = bitcoind_default_address(&ctx.bitcoin_config.network);
-        }
-
-        self.network = Some(ctx.bitcoin_config.network);
-    }
+    fn load_context(&mut self, _ctx: &Context) {}
     fn update(&mut self, _hws: &mut HardwareWallets, message: Message) -> Command<Message> {
         if let Message::DefineBitcoind(msg) = message {
             match msg {

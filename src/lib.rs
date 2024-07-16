@@ -207,30 +207,25 @@ fn setup_sqlite(
 // If all went well, returns the interface to bitcoind.
 fn setup_bitcoind(
     config: &Config,
-    data_dir: &path::Path,
+    _data_dir: &path::Path,
     fresh_data_dir: bool,
 ) -> Result<BitcoinD, StartupError> {
-    let wo_path: path::PathBuf = [data_dir, path::Path::new("lianad_watchonly_wallet")]
-        .iter()
-        .collect();
-    let wo_path_str = wo_path.to_str().expect("Must be valid unicode").to_string();
-    // NOTE: On Windows, paths are canonicalized with a "\\?\" prefix to tell Windows to interpret
-    // the string "as is" and to ignore the maximum size of a path. HOWEVER this is not properly
-    // handled by most implementations of the C++ STL's std::filesystem. Therefore bitcoind would
-    // fail to find the wallet if we didn't strip this prefix. It's not ideal, but a lesser evil
-    // than other workarounds i could think about.
-    // See https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#win32-file-namespaces
-    // about the prefix.
-    // See https://stackoverflow.com/questions/71590689/how-to-properly-handle-windows-paths-with-the-long-path-prefix-with-stdfilesys
-    // for a discussion of how one C++ STL implementation handles this.
-    #[cfg(target_os = "windows")]
-    let wo_path_str = wo_path_str.replace("\\\\?\\", "").replace("\\\\?", "");
-
     let bitcoind_config = config
         .bitcoind_config
         .as_ref()
         .ok_or(StartupError::MissingBitcoindConfig)?;
-    let bitcoind = BitcoinD::new(bitcoind_config, wo_path_str)?;
+
+    // Extract wallet fingerprint and append it to the wallet name
+    let descriptor_str = config.main_descriptor.clone().to_string();
+    let descriptor_fingerprint = descriptor_str
+        .split('#')
+        .last()
+        .expect("Descriptor always has a fingerprint");
+    let new_wo_path = format!("liana-{}", descriptor_fingerprint);
+
+    log::info!("new_wo_path: {}", new_wo_path);
+
+    let bitcoind = BitcoinD::new(bitcoind_config, new_wo_path)?;
     bitcoind.node_sanity_checks(
         config.bitcoin_config.network,
         config.main_descriptor.is_taproot(),
@@ -239,14 +234,13 @@ fn setup_bitcoind(
         log::info!("Creating a new watchonly wallet on bitcoind.");
         bitcoind.create_watchonly_wallet(&config.main_descriptor)?;
         log::info!("Watchonly wallet created.");
-    } else {
-        #[cfg(windows)]
-        if !cfg!(test) && !wo_path.exists() {
-            return Err(StartupError::NoWatchonlyInDatadir);
-        }
     }
+
     log::info!("Loading our watchonly wallet on bitcoind.");
-    bitcoind.maybe_load_watchonly_wallet()?;
+    if let Err(e) = bitcoind.maybe_load_watchonly_wallet() {
+        Err(e)?
+    }
+
     bitcoind.wallet_sanity_checks(&config.main_descriptor)?;
     log::info!("Watchonly wallet loaded on bitcoind and sanity checked.");
 

@@ -40,9 +40,9 @@ impl Launcher {
     pub fn new(datadir_path: PathBuf) -> Self {
         Self {
             choices: [
-                Network::Bitcoin,
-                Network::Testnet,
-                Network::Signet,
+                // Network::Bitcoin,
+                // Network::Testnet,
+                // Network::Signet,
                 Network::Regtest,
             ]
             .iter()
@@ -164,62 +164,14 @@ impl Launcher {
                                                 )
                                                 .push(text(format!(
                                                     "Create wallet on {}",
-                                                    wallet_name(&Network::Bitcoin)
+                                                    wallet_name(&Network::Regtest)
                                                 ))),
                                         )
-                                        .on_press(ViewMessage::StartInstall(Network::Bitcoin))
+                                        .on_press(ViewMessage::StartInstall(Network::Regtest))
                                         .padding(10)
                                         .width(Length::Fixed(400.0))
                                         .style(theme::Button::Border),
                                     )
-                                    .push(if !self.collapsed {
-                                        Column::new().push(
-                                            Button::new(
-                                                Row::new()
-                                                    .spacing(20)
-                                                    .align_items(Alignment::Center)
-                                                    .push(badge::Badge::new(icon::plus_icon()))
-                                                    .push(text("Create wallet on another network")),
-                                            )
-                                            .on_press(ViewMessage::ShowUninstalledNetworks)
-                                            .padding(10)
-                                            .width(Length::Fixed(400.0))
-                                            .style(theme::Button::TransparentBorder),
-                                        )
-                                    } else {
-                                        self.choices
-                                            .iter()
-                                            .filter_map(|(net, installed)| {
-                                                if *installed || *net == Network::Bitcoin {
-                                                    None
-                                                } else {
-                                                    Some(net)
-                                                }
-                                            })
-                                            .fold(Column::new().spacing(10), |col, choice| {
-                                                col.push(
-                                                    Button::new(
-                                                        Row::new()
-                                                            .spacing(20)
-                                                            .align_items(Alignment::Center)
-                                                            .push(
-                                                                badge::Badge::new(
-                                                                    icon::bitcoin_icon(),
-                                                                )
-                                                                .style(theme::Badge::Standard),
-                                                            )
-                                                            .push(text(format!(
-                                                                "Create wallet on {}",
-                                                                wallet_name(choice)
-                                                            ))),
-                                                    )
-                                                    .on_press(ViewMessage::StartInstall(*choice))
-                                                    .padding(10)
-                                                    .width(Length::Fixed(400.0))
-                                                    .style(theme::Button::Border),
-                                                )
-                                            })
-                                    })
                             } else {
                                 Column::new()
                                     .spacing(10)

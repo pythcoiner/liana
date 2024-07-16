@@ -849,19 +849,6 @@ pub fn define_bitcoin<'a>(
             .size(text::P1_SIZE)
             .padding(10),
         )
-        .push_maybe(if !is_loopback && address.valid {
-            Some(
-                iced::widget::Text::new(
-                    "Connection to a remote Bitcoin node \
-                    is not supported. Insert an IP address bound to the same machine \
-                    running Liana (ignore this warning if that's already the case)",
-                )
-                .style(color::ORANGE)
-                .size(text::CAPTION_SIZE),
-            )
-        } else {
-            None
-        })
         .spacing(10);
 
     let col_auth = Column::new()

@@ -106,10 +106,10 @@ pub fn default_datadir() -> Result<PathBuf, Box<dyn std::error::Error>> {
 
     if let Some(mut path) = configs_dir {
         #[cfg(target_os = "linux")]
-        path.push(".liana");
+        path.push(".liana_demo");
 
         #[cfg(not(target_os = "linux"))]
-        path.push("Liana");
+        path.push("LianaDemo");
 
         return Ok(path);
     }
