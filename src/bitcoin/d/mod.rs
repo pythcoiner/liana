@@ -536,23 +536,32 @@ impl BitcoinD {
         self.warning_from_res(&res)
     }
 
-    fn create_wallet(&self, wallet_path: String) -> Result<(), String> {
+    fn create_wallet(&self, wallet_path: String) -> Result<bool /* exist */, String> {
         // NOTE: we set load_on_startup to make sure the wallet will get updated before the
         // historical blocks are deleted in case the bitcoind is pruned.
-        let res = self
-            .make_fallible_node_request(
-                "createwallet",
-                params!(
-                    Json::String(wallet_path),
-                    Json::Bool(true),  // watchonly
-                    Json::Bool(true),  // blank
-                    Json::Null,        // passphrase
-                    Json::Bool(false), // avoid_reuse
-                    Json::Bool(true),  // descriptors
-                    Json::Bool(true)   // load_on_startup
-                ),
-            )
-            .map_err(|e| e.to_string())?;
+
+        let res = self.make_fallible_node_request(
+            "createwallet",
+            params!(
+                Json::String(wallet_path),
+                Json::Bool(true),  // watchonly
+                Json::Bool(true),  // blank
+                Json::Null,        // passphrase
+                Json::Bool(false), // avoid_reuse
+                Json::Bool(true),  // descriptors
+                Json::Bool(true)   // load_on_startup
+            ),
+        );
+        let res = if let Err(BitcoindError::Server(jsonrpc::error::Error::Rpc(e))) = &res {
+            if e.code == -4 && e.message.contains("Database already exists.") {
+                return Ok(true /*exist*/);
+            } else {
+                log::error!("create_wallet: {:?}", e);
+                res.map_err(|e| e.to_string())?
+            }
+        } else {
+            res.map_err(|e| e.to_string())?
+        };
 
         if let Some(warning) = self.warning_from_res(&res) {
             return Err(warning);
@@ -561,7 +570,7 @@ impl BitcoinD {
             return Err("Unknown error when create watchonly wallet".to_string());
         }
 
-        Ok(())
+        Ok(false /*exist*/)
     }
 
     // Import the receive and change descriptors from the multipath descriptor to bitcoind.
@@ -653,16 +662,19 @@ impl BitcoinD {
         self.maybe_unload_watchonly_wallet(self.watchonly_wallet_path.clone());
 
         // Now create the wallet and import the main descriptor.
-        self.create_wallet(self.watchonly_wallet_path.clone())
+        let wallet_exists = self
+            .create_wallet(self.watchonly_wallet_path.clone())
             .map_err(|e| {
                 BitcoindError::Wallet(self.watchonly_wallet_path.clone(), WalletError::Creating(e))
             })?;
-        // TODO: make it return an error instead of an option.
-        if let Some(err) = self.import_descriptor(main_descriptor) {
-            return Err(BitcoindError::Wallet(
-                self.watchonly_wallet_path.clone(),
-                WalletError::ImportingDescriptor(err),
-            ));
+        if !wallet_exists {
+            // TODO: make it return an error instead of an option.
+            if let Some(err) = self.import_descriptor(main_descriptor) {
+                return Err(BitcoindError::Wallet(
+                    self.watchonly_wallet_path.clone(),
+                    WalletError::ImportingDescriptor(err),
+                ));
+            }
         }
 
         Ok(())
