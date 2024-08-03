@@ -1,8 +1,10 @@
 use iced::Command;
 use std::{
     collections::HashMap,
+    fmt::Debug,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
+    time::Duration,
 };
 
 use crate::app::{settings, wallet::Wallet};
@@ -341,37 +343,62 @@ impl HardwareWallets {
             }
         }
     }
-
-    pub fn refresh(&self) -> iced::Subscription<HardwareWalletMessage> {
-        iced::subscription::unfold(
-            format!("refresh-{}", self.network),
-            State {
-                network: self.network,
-                keys_aliases: self.aliases.clone(),
-                wallet: self.wallet.clone(),
-                connected_supported_hws: Vec::new(),
-                api: None,
-                datadir_path: self.datadir_path.clone(),
-                hws: Vec::new(),
-                still: Vec::new(),
-            },
-            refresh,
-        )
-    }
 }
 
-pub struct State {
-    network: Network,
-    keys_aliases: HashMap<Fingerprint, String>,
-    wallet: Option<Arc<Wallet>>,
-    connected_supported_hws: Vec<String>,
-    api: Option<ledger::HidApi>,
-    datadir_path: PathBuf,
-    hws: Vec<HardwareWallet>,
-    still: Vec<String>,
+pub async fn poll_hw(sender: mpsc::Sender<HwMessage>, dest: Destination) -> HwMessage {
+    log::info!("poll_hw()");
+    let _ = sender.send(HwMessage::Poll(dest.clone()));
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    HwMessage::Poll(dest)
 }
 
-async fn refresh(mut state: State) -> (HardwareWalletMessage, State) {
+#[derive(Debug, Clone)]
+pub enum Destination {
+    Installer,
+    SettingsWallet,
+    Receive,
+    Psbt,
+}
+
+pub enum HwMessage {
+    Poll(Destination),
+}
+
+pub struct HwState {
+    pub network: Network,
+    pub keys_aliases: HashMap<Fingerprint, String>,
+    pub wallet: Option<Arc<Wallet>>,
+    pub taproot: bool,
+    pub connected_supported_hws: Vec<String>,
+    pub api: Option<ledger::HidApi>,
+    pub datadir_path: PathBuf,
+    pub hws: Vec<HardwareWallet>,
+    pub still: Vec<String>,
+    pub receiver: Option<mpsc::Receiver<HwMessage>>,
+}
+
+pub async fn hw_refresh(mut state: HwState) -> (crate::message::Message, HwState) {
+    let receiver = state.receiver.take().expect("Should have a receiver");
+    let ((msg, mut state), dest) = match receiver.recv().expect("All Senders have been dropped") {
+        HwMessage::Poll(dest) => (hw_poll(state).await, dest),
+    };
+    state.receiver = Some(receiver);
+
+    let msg = match dest {
+        Destination::Installer => crate::message::Message::Install(Box::new(
+            crate::installer::Message::HardwareWallets(msg),
+        )),
+        Destination::SettingsWallet => todo!(),
+        Destination::Receive => todo!(),
+        Destination::Psbt => todo!(),
+    };
+
+    log::info!("msg -> {:#?}", msg);
+    (msg, state)
+}
+
+async fn hw_poll(mut state: HwState) -> (HardwareWalletMessage, HwState) {
+    log::info!("hw_poll()");
     let api = if let Some(api) = state.api.take() {
         api
     } else {
@@ -442,10 +469,11 @@ async fn refresh(mut state: State) -> (HardwareWalletMessage, State) {
     });
     (state.hws, state.still) = (Vec::new(), Vec::new());
     state.api = Some(api);
+
     (msg, state)
 }
 
-pub async fn poll_specter_simulator(state: &mut State) {
+pub async fn poll_specter_simulator(state: &mut HwState) {
     match specter::SpecterSimulator::try_connect().await {
         Ok(device) => {
             let id = "specter-simulator".to_string();
@@ -467,7 +495,7 @@ pub async fn poll_specter_simulator(state: &mut State) {
     }
 }
 
-pub async fn poll_specter(state: &mut State) {
+pub async fn poll_specter(state: &mut HwState) {
     match specter::SerialTransport::enumerate_potential_ports() {
         Ok(ports) => {
             for port in ports {
@@ -509,7 +537,7 @@ pub async fn poll_specter(state: &mut State) {
     }
 }
 
-pub async fn poll_jade(state: &mut State) {
+pub async fn poll_jade(state: &mut HwState) {
     match jade::SerialTransport::enumerate_potential_ports() {
         Ok(ports) => {
             for port in ports {
@@ -635,7 +663,7 @@ async fn handle_jade_device(
     }
 }
 
-pub async fn poll_ledger_simulator(state: &mut State) {
+pub async fn poll_ledger_simulator(state: &mut HwState) {
     match ledger::LedgerSimulator::try_connect().await {
         Ok(mut device) => {
             let id = "ledger-simulator".to_string();
@@ -703,7 +731,7 @@ pub async fn poll_ledger_simulator(state: &mut State) {
     }
 }
 
-pub async fn poll_ledger(state: &mut State, api: &HidApi) {
+pub async fn poll_ledger(state: &mut HwState, api: &HidApi) {
     for detected in ledger::Ledger::<ledger::TransportHID>::enumerate(api) {
         let id = format!(
             "ledger-{:?}-{}-{}",
@@ -711,6 +739,7 @@ pub async fn poll_ledger(state: &mut State, api: &HidApi) {
             detected.vendor_id(),
             detected.product_id()
         );
+        log::info!("ledger -> {}", id);
         if state.connected_supported_hws.contains(&id) {
             state.still.push(id);
             continue;
@@ -776,7 +805,7 @@ pub async fn poll_ledger(state: &mut State, api: &HidApi) {
     }
 }
 
-pub async fn handle_bitbox02(state: &mut State, device_info: &DeviceInfo, api: &HidApi) -> bool {
+pub async fn handle_bitbox02(state: &mut HwState, device_info: &DeviceInfo, api: &HidApi) -> bool {
     let id = format!(
         "bitbox-{:?}-{}-{}",
         device_info.path(),
@@ -808,7 +837,7 @@ pub async fn handle_bitbox02(state: &mut State, device_info: &DeviceInfo, api: &
     false
 }
 
-pub async fn handle_coldcard(state: &mut State, device_info: &DeviceInfo, api: &HidApi) -> bool {
+pub async fn handle_coldcard(state: &mut HwState, device_info: &DeviceInfo, api: &HidApi) -> bool {
     let id = format!(
         "coldcard-{:?}-{}-{}",
         device_info.path(),

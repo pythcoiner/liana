@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     iter::FromIterator,
     str::FromStr,
-    sync::Arc,
+    sync::{mpsc, Arc},
 };
 
 use iced::{Command, Subscription};
@@ -24,6 +24,7 @@ use crate::{
         model::{remaining_sequence, Coin, CreateSpendResult, SpendTx},
         Daemon,
     },
+    hw::HwMessage,
 };
 
 /// See: https://github.com/wizardsardine/liana/blob/master/src/commands/mod.rs#L32
@@ -734,14 +735,16 @@ pub struct SaveSpend {
     wallet: Arc<Wallet>,
     spend: Option<(psbt::PsbtState, Vec<String>)>,
     curve: secp256k1::Secp256k1<secp256k1::VerifyOnly>,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl SaveSpend {
-    pub fn new(wallet: Arc<Wallet>) -> Self {
+    pub fn new(wallet: Arc<Wallet>, hw_sender: mpsc::Sender<HwMessage>) -> Self {
         Self {
             wallet,
             spend: None,
             curve: secp256k1::Secp256k1::verification_only(),
+            hw_sender,
         }
     }
 }
@@ -773,7 +776,7 @@ impl Step for SaveSpend {
         }
 
         self.spend = Some((
-            psbt::PsbtState::new(self.wallet.clone(), tx, false),
+            psbt::PsbtState::new(self.wallet.clone(), tx, false, self.hw_sender.clone()),
             warnings,
         ));
     }

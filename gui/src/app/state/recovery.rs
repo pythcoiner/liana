@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::{collections::HashSet, sync::mpsc};
 
 use iced::Command;
 
@@ -13,6 +13,7 @@ use liana::{
 };
 use liana_ui::{component::form, widget::Element};
 
+use crate::hw::HwMessage;
 use crate::{
     app::{
         cache::Cache,
@@ -40,10 +41,16 @@ pub struct RecoveryPanel {
     feerate: form::Value<String>,
     recipient: form::Value<String>,
     generated: Option<psbt::PsbtState>,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl RecoveryPanel {
-    pub fn new(wallet: Arc<Wallet>, coins: &[Coin], blockheight: i32) -> Self {
+    pub fn new(
+        wallet: Arc<Wallet>,
+        coins: &[Coin],
+        blockheight: i32,
+        hw_sender: mpsc::Sender<HwMessage>,
+    ) -> Self {
         Self {
             recovery_paths: recovery_paths(&wallet, coins, blockheight),
             wallet,
@@ -52,6 +59,7 @@ impl RecoveryPanel {
             feerate: form::Value::default(),
             recipient: form::Value::default(),
             generated: None,
+            hw_sender,
         }
     }
 }
@@ -114,7 +122,12 @@ impl State for RecoveryPanel {
             },
             Message::Recovery(res) => match res {
                 Ok(tx) => {
-                    self.generated = Some(psbt::PsbtState::new(self.wallet.clone(), tx, false))
+                    self.generated = Some(psbt::PsbtState::new(
+                        self.wallet.clone(),
+                        tx,
+                        false,
+                        self.hw_sender.clone(),
+                    ))
                 }
                 Err(e) => self.warning = Some(e),
             },

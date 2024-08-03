@@ -10,6 +10,7 @@ pub mod loader;
 pub mod logger;
 pub mod signer;
 pub mod utils;
+pub mod message;
 
 use liana::Version;
 

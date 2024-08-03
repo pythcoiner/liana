@@ -1,7 +1,13 @@
 #![windows_subsystem = "windows"]
 
 use std::{
-    collections::HashMap, error::Error, io::Write, path::PathBuf, process, str::FromStr, sync::Arc,
+    collections::HashMap,
+    error::Error,
+    io::Write,
+    path::PathBuf,
+    process,
+    str::FromStr,
+    sync::{mpsc, Arc, Mutex},
 };
 
 use iced::{
@@ -22,17 +28,19 @@ use liana_ui::{component::text, font, image, theme, widget::Element};
 use liana_gui::{
     app::{
         self,
+        bitcoin::Network,
         cache::Cache,
         config::{default_datadir, ConfigError},
         wallet::Wallet,
         App,
     },
-    hw::HardwareWalletConfig,
+    hw::{hw_refresh, HardwareWalletConfig, HwMessage, HwState},
     installer::{self, Installer},
     launcher::{self, Launcher},
     lianalite::client::{auth::AuthClient, backend::BackendClient, get_service_config},
     loader::{self, Loader},
     logger::Logger,
+    message::{Key, Message},
     VERSION,
 };
 
@@ -111,6 +119,8 @@ pub struct GUI {
     logger: Logger,
     // if set up, it overrides the level filter of the logger.
     log_level: Option<LevelFilter>,
+    hw_sender: mpsc::Sender<HwMessage>,
+    hw_receiver: Arc<Mutex<Option<mpsc::Receiver<HwMessage>>>>,
 }
 
 enum State {
@@ -118,29 +128,6 @@ enum State {
     Installer(Box<Installer>),
     Loader(Box<Loader>),
     App(App),
-}
-
-#[derive(Debug)]
-pub enum Key {
-    Tab(bool),
-}
-
-#[derive(Debug)]
-pub enum Message {
-    CtrlC,
-    FontLoaded(Result<(), iced::font::Error>),
-    Launch(Box<launcher::Message>),
-    Install(Box<installer::Message>),
-    Load(Box<loader::Message>),
-    Run(Box<app::Message>),
-    KeyPressed(Key),
-    Event(iced::Event),
-}
-
-impl From<Result<(), iced::font::Error>> for Message {
-    fn from(value: Result<(), iced::font::Error>) -> Self {
-        Self::FontLoaded(value)
-    }
 }
 
 async fn ctrl_c() -> Result<(), ()> {
@@ -168,6 +155,7 @@ impl Application for GUI {
         let logger = Logger::setup(log_level.unwrap_or(LevelFilter::INFO));
         let mut cmds = font::loads();
         cmds.push(Command::perform(ctrl_c(), |_| Message::CtrlC));
+        let (hw_sender, hw_receiver) = mpsc::channel();
         let state = match config {
             Config::Launcher(datadir_path) => {
                 let launcher = Launcher::new(datadir_path);
@@ -190,7 +178,7 @@ impl Application for GUI {
                     datadir_path.clone(),
                     log_level.unwrap_or(LevelFilter::INFO),
                 );
-                let (install, command) = Installer::new(datadir_path, network);
+                let (install, command) = Installer::new(datadir_path, network, hw_sender.clone());
                 cmds.push(command.map(|msg| Message::Install(Box::new(msg))));
                 State::Installer(Box::new(install))
             }
@@ -293,6 +281,7 @@ impl Application for GUI {
                     Arc::new(client),
                     default_datadir().unwrap(),
                     None,
+                    hw_sender.clone(),
                 );
                 cmds.push(command.map(|msg| Message::Run(Box::new(msg))));
                 State::App(app)
@@ -303,12 +292,15 @@ impl Application for GUI {
                 state,
                 logger,
                 log_level,
+                hw_sender,
+                hw_receiver: Arc::new(Mutex::new(Some(hw_receiver))),
             },
             Command::batch(cmds),
         )
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        log::info!("GUI.update({message:?})");
         match (&mut self.state, message) {
             (_, Message::CtrlC)
             | (_, Message::Event(iced::Event::Window(_, iced::window::Event::CloseRequested))) => {
@@ -346,7 +338,8 @@ impl Application for GUI {
                         datadir_path.clone(),
                         self.log_level.unwrap_or(LevelFilter::INFO),
                     );
-                    let (install, command) = Installer::new(datadir_path, network);
+                    let (install, command) =
+                        Installer::new(datadir_path, network, self.hw_sender.clone());
                     self.state = State::Installer(Box::new(install));
                     command.map(|msg| Message::Install(Box::new(msg)))
                 }
@@ -411,6 +404,7 @@ impl Application for GUI {
                         daemon,
                         loader.datadir_path.clone(),
                         bitcoind,
+                        self.hw_sender.clone(),
                     );
                     self.state = State::App(app);
                     command.map(|msg| Message::Run(Box::new(msg)))
@@ -425,7 +419,7 @@ impl Application for GUI {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        Subscription::batch(vec![
+        let mut sub = vec![
             match &self.state {
                 State::Installer(v) => v.subscription().map(|msg| Message::Install(Box::new(msg))),
                 State::Loader(v) => v.subscription().map(|msg| Message::Load(Box::new(msg))),
@@ -447,8 +441,29 @@ impl Application for GUI {
                 ) => Some(Message::Event(event)),
                 _ => None,
             }),
-        ])
-        .with_filter(|event| {
+        ];
+        // FIXME: maybe wrap (hw_sender, hw_receiver) into a HwMessage on subscription launch instead
+        // using a Mutex
+        if let Ok(mut receiver) = self.hw_receiver.try_lock() {
+            log::info!("Call HW subscription");
+            sub.push(iced::subscription::unfold(
+                "refresh_hw".to_string(),
+                HwState {
+                    network: Network::Bitcoin,
+                    keys_aliases: HashMap::new(),
+                    wallet: None,
+                    connected_supported_hws: Vec::new(),
+                    api: None,
+                    datadir_path: "".into(),
+                    hws: Vec::new(),
+                    still: Vec::new(),
+                    taproot: false,
+                    receiver: receiver.take(),
+                },
+                hw_refresh,
+            ))
+        }
+        Subscription::batch(sub).with_filter(|event| {
             matches!(
                 event,
                 iced::Event::Window(_, iced::window::Event::CloseRequested)

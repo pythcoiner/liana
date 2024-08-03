@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
-use iced::{widget::qr_code, Command, Subscription};
+use iced::{widget::qr_code, Command};
 use liana::miniscript::bitcoin::{
     bip32::{ChildNumber, Fingerprint},
     Address, Network,
 };
 use liana_ui::{component::modal, widget::*};
 
+use crate::hw::{poll_hw, HwMessage};
 use crate::{
     app::{
         cache::Cache,
@@ -59,10 +60,11 @@ pub struct ReceivePanel {
     labels_edited: LabelsEdited,
     modal: Modal,
     warning: Option<Error>,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl ReceivePanel {
-    pub fn new(data_dir: PathBuf, wallet: Arc<Wallet>) -> Self {
+    pub fn new(data_dir: PathBuf, wallet: Arc<Wallet>, hw_sender: mpsc::Sender<HwMessage>) -> Self {
         Self {
             data_dir,
             wallet,
@@ -70,6 +72,7 @@ impl ReceivePanel {
             labels_edited: LabelsEdited::default(),
             modal: Modal::None,
             warning: None,
+            hw_sender,
         }
     }
 }
@@ -95,14 +98,6 @@ impl State for ReceivePanel {
                 .on_blur(Some(view::Message::Close))
                 .into(),
             Modal::None => content,
-        }
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        if let Modal::VerifyAddress(modal) = &self.modal {
-            modal.subscription()
-        } else {
-            Subscription::none()
         }
     }
 
@@ -153,7 +148,10 @@ impl State for ReceivePanel {
                         .get(i)
                         .expect("Must be present"),
                 ));
-                Command::none()
+                Command::perform(
+                    poll_hw(self.hw_sender.clone(), crate::hw::Destination::Receive),
+                    From::from,
+                )
             }
             Message::View(view::Message::Next) => {
                 let daemon = daemon.clone();
@@ -178,6 +176,16 @@ impl State for ReceivePanel {
                     }
                 }
                 Command::none()
+            }
+            Message::PollHw => {
+                if let Modal::VerifyAddress(_) = self.modal {
+                    Command::perform(
+                        poll_hw(self.hw_sender.clone(), crate::hw::Destination::Receive),
+                        From::from,
+                    )
+                } else {
+                    Command::none()
+                }
             }
             _ => {
                 if let Modal::VerifyAddress(ref mut m) = self.modal {
@@ -251,10 +259,6 @@ impl VerifyAddressModal {
             &self.address,
             &self.derivation_index,
         )
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        self.hws.refresh().map(Message::HardwareWallets)
     }
 
     fn update(
@@ -365,8 +369,9 @@ mod tests {
             ))),
         )]);
         let wallet = Arc::new(Wallet::new(LianaDescriptor::from_str(DESC).unwrap()));
+        let (hw_sender, _) = mpsc::channel();
         let sandbox: Sandbox<ReceivePanel> =
-            Sandbox::new(ReceivePanel::new(PathBuf::new(), wallet.clone()));
+            Sandbox::new(ReceivePanel::new(PathBuf::new(), wallet.clone(), hw_sender));
         let client = Arc::new(Lianad::new(daemon.run()));
         let sandbox = sandbox.load(client, &Cache::default(), wallet).await;
 

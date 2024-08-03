@@ -10,6 +10,7 @@ use liana::{
     },
 };
 
+use crate::hw::HwMessage;
 use crate::{
     app::{cache::Cache, error::Error, view, wallet::Wallet},
     daemon::model::*,
@@ -44,4 +45,11 @@ pub enum Message {
     LabelsUpdated(Result<HashMap<String, Option<String>>, Error>),
     BroadcastModal(Result<HashSet<Txid>, Error>),
     RbfModal(Box<HistoryTransaction>, bool, Result<HashSet<Txid>, Error>),
+    PollHw,
+}
+
+impl From<HwMessage> for Message {
+    fn from(_value: HwMessage) -> Self {
+        Self::PollHw
+    }
 }

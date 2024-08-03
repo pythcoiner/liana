@@ -1,6 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 
-use iced::{Command, Subscription};
+use iced::Command;
 use liana::miniscript::bitcoin::{
     bip32::{ChildNumber, Fingerprint},
     Network,
@@ -9,7 +9,7 @@ use liana::miniscript::bitcoin::{
 use liana_ui::widget::Element;
 
 use crate::{
-    hw::{HardwareWallet, HardwareWallets},
+    hw::{poll_hw, HardwareWallet, HardwareWallets, HwMessage},
     installer::{
         message::Message,
         step::{
@@ -70,19 +70,31 @@ pub struct ShareXpubs {
     network: Network,
     hw_xpubs: Vec<HardwareWalletXpubs>,
     xpubs_signer: SignerXpubs,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl ShareXpubs {
-    pub fn new(network: Network, signer: Arc<Mutex<Signer>>) -> Self {
+    pub fn new(
+        network: Network,
+        signer: Arc<Mutex<Signer>>,
+        hw_sender: mpsc::Sender<HwMessage>,
+    ) -> Self {
         Self {
             network,
             hw_xpubs: Vec::new(),
             xpubs_signer: SignerXpubs::new(signer),
+            hw_sender,
         }
     }
 }
 
 impl Step for ShareXpubs {
+    fn load(&self) -> Command<Message> {
+        Command::perform(
+            poll_hw(self.hw_sender.clone(), crate::hw::Destination::Installer),
+            From::from,
+        )
+    }
     // form value is set as valid each time it is edited.
     // Verification of the values is happening when the user click on Next button.
     fn update(&mut self, hws: &mut HardwareWallets, message: Message) -> Command<Message> {
@@ -144,13 +156,15 @@ impl Step for ShareXpubs {
                     );
                 }
             }
+            Message::PollHw => {
+                return Command::perform(
+                    poll_hw(self.hw_sender.clone(), crate::hw::Destination::Installer),
+                    From::from,
+                )
+            }
             _ => {}
         };
         Command::none()
-    }
-
-    fn subscription(&self, hws: &HardwareWallets) -> Subscription<Message> {
-        hws.refresh().map(Message::HardwareWallets)
     }
 
     fn apply(&mut self, ctx: &mut Context) -> bool {

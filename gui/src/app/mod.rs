@@ -9,11 +9,11 @@ pub mod wallet;
 
 mod error;
 
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::{fs::OpenOptions, sync::mpsc};
 
 use iced::{clipboard, time, Command, Subscription};
 use tokio::runtime::Handle;
@@ -33,6 +33,7 @@ use state::{
     TransactionsPanel,
 };
 
+use crate::hw::HwMessage;
 use crate::{
     app::{cache::Cache, error::Error, menu::Menu, wallet::Wallet},
     bitcoind::Bitcoind,
@@ -60,26 +61,34 @@ impl Panels {
         data_dir: PathBuf,
         daemon_backend: DaemonBackend,
         internal_bitcoind: Option<&Bitcoind>,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> Panels {
         Self {
             current: Menu::Home,
             home: Home::new(wallet.clone(), &cache.coins),
             coins: CoinsPanel::new(&cache.coins, wallet.main_descriptor.first_timelock_value()),
             transactions: TransactionsPanel::new(wallet.clone()),
-            psbts: PsbtsPanel::new(wallet.clone()),
-            recovery: RecoveryPanel::new(wallet.clone(), &cache.coins, cache.blockheight),
-            receive: ReceivePanel::new(data_dir.clone(), wallet.clone()),
+            psbts: PsbtsPanel::new(wallet.clone(), hw_sender.clone()),
+            recovery: RecoveryPanel::new(
+                wallet.clone(),
+                &cache.coins,
+                cache.blockheight,
+                hw_sender.clone(),
+            ),
+            receive: ReceivePanel::new(data_dir.clone(), wallet.clone(), hw_sender.clone()),
             create_spend: CreateSpendPanel::new(
                 wallet.clone(),
                 &cache.coins,
                 cache.blockheight as u32,
                 cache.network,
+                hw_sender.clone(),
             ),
             settings: state::SettingsState::new(
                 data_dir,
                 wallet.clone(),
                 daemon_backend,
                 internal_bitcoind.is_some(),
+                hw_sender.clone(),
             ),
         }
     }
@@ -123,7 +132,7 @@ pub struct App {
     wallet: Arc<Wallet>,
     daemon: Arc<dyn Daemon + Sync + Send>,
     internal_bitcoind: Option<Bitcoind>,
-
+    hw_sender: mpsc::Sender<HwMessage>,
     panels: Panels,
 }
 
@@ -135,6 +144,7 @@ impl App {
         daemon: Arc<dyn Daemon + Sync + Send>,
         data_dir: PathBuf,
         internal_bitcoind: Option<Bitcoind>,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> (App, Command<Message>) {
         let mut panels = Panels::new(
             &cache,
@@ -142,6 +152,7 @@ impl App {
             data_dir,
             daemon.backend(),
             internal_bitcoind.as_ref(),
+            hw_sender.clone(),
         );
         let cmd = panels.home.reload(daemon.clone(), wallet.clone());
         (
@@ -152,6 +163,7 @@ impl App {
                 daemon,
                 wallet,
                 internal_bitcoind,
+                hw_sender,
             },
             cmd,
         )
@@ -195,6 +207,7 @@ impl App {
                     self.cache.blockheight as u32,
                     preselected,
                     self.cache.network,
+                    self.hw_sender.clone(),
                 );
             }
             menu::Menu::CreateSpendTx => {
@@ -205,6 +218,7 @@ impl App {
                         &self.cache.coins,
                         self.cache.blockheight as u32,
                         self.cache.network,
+                        self.hw_sender.clone(),
                     );
                 }
             }

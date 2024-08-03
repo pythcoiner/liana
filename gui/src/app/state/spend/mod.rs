@@ -1,7 +1,7 @@
 mod step;
 
-use std::collections::HashSet;
 use std::sync::Arc;
+use std::{collections::HashSet, sync::mpsc};
 
 use iced::Command;
 
@@ -12,6 +12,7 @@ use liana::{
 use liana_ui::widget::Element;
 
 use super::{redirect, State};
+use crate::hw::HwMessage;
 use crate::{
     app::{cache::Cache, error::Error, menu::Menu, message::Message, view, wallet::Wallet},
     daemon::{
@@ -27,7 +28,13 @@ pub struct CreateSpendPanel {
 }
 
 impl CreateSpendPanel {
-    pub fn new(wallet: Arc<Wallet>, coins: &[Coin], blockheight: u32, network: Network) -> Self {
+    pub fn new(
+        wallet: Arc<Wallet>,
+        coins: &[Coin],
+        blockheight: u32,
+        network: Network,
+        hw_sender: mpsc::Sender<HwMessage>,
+    ) -> Self {
         let descriptor = wallet.main_descriptor.clone();
         let timelock = descriptor.first_timelock_value();
         Self {
@@ -38,7 +45,7 @@ impl CreateSpendPanel {
                     step::DefineSpend::new(network, descriptor, coins, timelock)
                         .with_coins_sorted(blockheight),
                 ),
-                Box::new(step::SaveSpend::new(wallet)),
+                Box::new(step::SaveSpend::new(wallet, hw_sender.clone())),
             ],
         }
     }
@@ -49,6 +56,7 @@ impl CreateSpendPanel {
         blockheight: u32,
         preselected_coins: &[OutPoint],
         network: Network,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> Self {
         let descriptor = wallet.main_descriptor.clone();
         let timelock = descriptor.first_timelock_value();
@@ -62,7 +70,7 @@ impl CreateSpendPanel {
                         .with_coins_sorted(blockheight)
                         .self_send(),
                 ),
-                Box::new(step::SaveSpend::new(wallet)),
+                Box::new(step::SaveSpend::new(wallet, hw_sender.clone())),
             ],
         }
     }

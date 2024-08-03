@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::FromIterator;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 
 use iced::{Command, Subscription};
 use liana::miniscript::bitcoin::bip32::Xpub;
@@ -25,7 +25,7 @@ use liana_ui::{
 
 use async_hwi::{DeviceKind, Version};
 
-use crate::hw;
+use crate::hw::{self, poll_hw, HwMessage};
 use crate::{
     app::{settings::KeySetting, wallet::wallet_name},
     hw::{HardwareWallet, HardwareWallets},
@@ -204,10 +204,15 @@ pub struct DefineDescriptor {
     signer: Arc<Mutex<Signer>>,
 
     error: Option<String>,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl DefineDescriptor {
-    pub fn new(network: Network, signer: Arc<Mutex<Signer>>) -> Self {
+    pub fn new(
+        network: Network,
+        signer: Arc<Mutex<Signer>>,
+        hw_sender: mpsc::Sender<HwMessage>,
+    ) -> Self {
         Self {
             network,
             use_taproot: false,
@@ -215,6 +220,7 @@ impl DefineDescriptor {
             modal: None,
             signer,
             error: None,
+            hw_sender,
         }
     }
 
@@ -310,6 +316,7 @@ impl Step for DefineDescriptor {
                                 .filter(|k| check_key_network(&k.key, network))
                                 .cloned()
                                 .collect(),
+                            self.hw_sender.clone(),
                         );
                         let cmd = modal.load();
                         self.modal = Some(Box::new(modal));
@@ -401,6 +408,7 @@ impl Step for DefineDescriptor {
                             self.network,
                             self.signer.clone(),
                             self.setup.keys.clone(),
+                            self.hw_sender.clone(),
                         );
                         let cmd = modal.load();
                         self.modal = Some(Box::new(modal));
@@ -738,6 +746,7 @@ pub struct EditXpubModal {
     hot_signer: Arc<Mutex<Signer>>,
     hot_signer_fingerprint: Fingerprint,
     chosen_signer: Option<(Fingerprint, Option<DeviceKind>, Option<Version>)>,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl EditXpubModal {
@@ -751,6 +760,7 @@ impl EditXpubModal {
         network: Network,
         hot_signer: Arc<Mutex<Signer>>,
         keys: Vec<Key>,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> Self {
         let hot_signer_fingerprint = hot_signer.lock().unwrap().fingerprint();
         Self {
@@ -791,10 +801,14 @@ impl EditXpubModal {
             hot_signer_fingerprint,
             hot_signer,
             duplicate_master_fg: false,
+            hw_sender,
         }
     }
     fn load(&self) -> Command<Message> {
-        Command::none()
+        Command::perform(
+            poll_hw(self.hw_sender.clone(), hw::Destination::Installer),
+            From::from,
+        )
     }
 }
 
@@ -989,13 +1003,15 @@ impl DescriptorEditModal for EditXpubModal {
                     }
                 }
             },
+            Message::PollHw => {
+                return Command::perform(
+                    poll_hw(self.hw_sender.clone(), hw::Destination::Installer),
+                    From::from,
+                )
+            }
             _ => {}
         };
         Command::none()
-    }
-
-    fn subscription(&self, hws: &HardwareWallets) -> Subscription<Message> {
-        hws.refresh().map(Message::HardwareWallets)
     }
 
     fn view<'a>(&'a self, hws: &'a HardwareWallets) -> Element<'a, Message> {
@@ -1195,10 +1211,11 @@ pub struct RegisterDescriptor {
     /// whether a signing device is used, to explicit this step is not required if the user isn't
     /// using a signing device.
     created_desc: bool,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl RegisterDescriptor {
-    fn new(created_desc: bool) -> Self {
+    fn new(created_desc: bool, hw_sender: mpsc::Sender<HwMessage>) -> Self {
         Self {
             created_desc,
             descriptor: Default::default(),
@@ -1208,15 +1225,16 @@ impl RegisterDescriptor {
             registered: Default::default(),
             error: Default::default(),
             done: Default::default(),
+            hw_sender,
         }
     }
 
-    pub fn new_create_wallet() -> Self {
-        Self::new(true)
+    pub fn new_create_wallet(hw_sender: mpsc::Sender<HwMessage>) -> Self {
+        Self::new(true, hw_sender)
     }
 
-    pub fn new_import_wallet() -> Self {
-        Self::new(false)
+    pub fn new_import_wallet(hw_sender: mpsc::Sender<HwMessage>) -> Self {
+        Self::new(false, hw_sender)
     }
 }
 
@@ -1287,6 +1305,12 @@ impl Step for RegisterDescriptor {
             Message::UserActionDone(done) => {
                 self.done = done;
             }
+            Message::PollHw => {
+                return Command::perform(
+                    poll_hw(self.hw_sender.clone(), hw::Destination::Installer),
+                    From::from,
+                )
+            }
             _ => {}
         };
         Command::none()
@@ -1300,11 +1324,11 @@ impl Step for RegisterDescriptor {
         }
         true
     }
-    fn subscription(&self, hws: &HardwareWallets) -> Subscription<Message> {
-        hws.refresh().map(Message::HardwareWallets)
-    }
     fn load(&self) -> Command<Message> {
-        Command::none()
+        Command::perform(
+            poll_hw(self.hw_sender.clone(), hw::Destination::Installer),
+            From::from,
+        )
     }
     fn view<'a>(
         &'a self,
@@ -1381,7 +1405,7 @@ mod tests {
     use super::*;
     use iced_runtime::command::Action;
     use std::path::PathBuf;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{mpsc, Arc, Mutex};
 
     pub struct Sandbox<S: Step> {
         step: Arc<Mutex<S>>,
@@ -1416,10 +1440,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_define_descriptor_use_hotkey() {
-        let mut ctx = Context::new(Network::Signet, PathBuf::from_str("/").unwrap());
+        let (sender, _) = mpsc::channel();
+        let mut ctx = Context::new(Network::Signet, PathBuf::from_str("/").unwrap(), sender);
         let sandbox: Sandbox<DefineDescriptor> = Sandbox::new(DefineDescriptor::new(
             Network::Bitcoin,
             Arc::new(Mutex::new(Signer::generate(Network::Bitcoin).unwrap())),
+            ctx.hw_sender.clone(),
         ));
 
         // Edit primary key
@@ -1498,10 +1524,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_define_descriptor_stores_if_hw_is_used() {
-        let mut ctx = Context::new(Network::Testnet, PathBuf::from_str("/").unwrap());
+        let (sender, _) = mpsc::channel();
+        let mut ctx = Context::new(Network::Testnet, PathBuf::from_str("/").unwrap(), sender);
         let sandbox: Sandbox<DefineDescriptor> = Sandbox::new(DefineDescriptor::new(
             Network::Testnet,
             Arc::new(Mutex::new(Signer::generate(Network::Testnet).unwrap())),
+            ctx.hw_sender.clone(),
         ));
         sandbox.load(&ctx).await;
 

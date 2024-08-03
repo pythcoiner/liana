@@ -1,9 +1,9 @@
-use std::collections::HashSet;
 use std::convert::From;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{collections::HashSet, sync::mpsc};
 
-use iced::{Command, Subscription};
+use iced::Command;
 
 use liana::miniscript::bitcoin::{bip32::Fingerprint, Network};
 
@@ -12,12 +12,13 @@ use liana_ui::{
     widget::Element,
 };
 
+use crate::hw::{Destination, HwMessage};
 use crate::{
     app::{
         cache::Cache, error::Error, message::Message, settings, state::State, view, wallet::Wallet,
     },
     daemon::{Daemon, DaemonBackend},
-    hw::{HardwareWallet, HardwareWalletConfig, HardwareWallets},
+    hw::{poll_hw, HardwareWallet, HardwareWalletConfig, HardwareWallets},
 };
 
 pub struct WalletSettingsState {
@@ -29,10 +30,11 @@ pub struct WalletSettingsState {
     modal: Option<RegisterWalletModal>,
     processing: bool,
     updated: bool,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl WalletSettingsState {
-    pub fn new(data_dir: PathBuf, wallet: Arc<Wallet>) -> Self {
+    pub fn new(data_dir: PathBuf, wallet: Arc<Wallet>, hw_sender: mpsc::Sender<HwMessage>) -> Self {
         WalletSettingsState {
             data_dir,
             descriptor: wallet.main_descriptor.to_string(),
@@ -42,6 +44,7 @@ impl WalletSettingsState {
             modal: None,
             processing: false,
             updated: false,
+            hw_sender,
         }
     }
 
@@ -88,14 +91,6 @@ impl State for WalletSettingsState {
                 .into()
         } else {
             content
-        }
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        if let Some(modal) = &self.modal {
-            modal.subscription()
-        } else {
-            Subscription::none()
         }
     }
 
@@ -162,7 +157,23 @@ impl State for WalletSettingsState {
                     self.wallet.clone(),
                     cache.network,
                 ));
-                Command::none()
+                Command::perform(
+                    poll_hw(self.hw_sender.clone(), Destination::SettingsWallet),
+                    From::from,
+                )
+            }
+            Message::PollHw => {
+                if self.modal.is_some() {
+                    Command::perform(
+                        poll_hw(
+                            self.hw_sender.clone(),
+                            crate::hw::Destination::SettingsWallet,
+                        ),
+                        From::from,
+                    )
+                } else {
+                    Command::none()
+                }
             }
             _ => self
                 .modal
@@ -230,10 +241,6 @@ impl RegisterWalletModal {
             self.chosen_hw,
             &self.registered,
         )
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        self.hws.refresh().map(Message::HardwareWallets)
     }
 
     fn update(

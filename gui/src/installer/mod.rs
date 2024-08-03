@@ -14,13 +14,13 @@ use tracing::{error, info, warn};
 
 use context::Context;
 
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::{io::Write, sync::mpsc};
 
 use crate::{
     app::{config as gui_config, settings as gui_settings},
-    hw::HardwareWallets,
+    hw::{HardwareWallets, HwMessage},
     signer::Signer,
 };
 
@@ -62,6 +62,7 @@ impl Installer {
     pub fn new(
         destination_path: PathBuf,
         network: bitcoin::Network,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> (Installer, Command<Message>) {
         (
             Installer {
@@ -69,7 +70,7 @@ impl Installer {
                 current: 0,
                 hws: HardwareWallets::new(destination_path.clone(), network),
                 steps: vec![Welcome::default().into()],
-                context: Context::new(network, destination_path),
+                context: Context::new(network, destination_path, hw_sender),
                 signer: Arc::new(Mutex::new(Signer::generate(network).unwrap())),
             },
             Command::none(),
@@ -140,14 +141,20 @@ impl Installer {
     }
 
     pub fn update(&mut self, message: Message) -> Command<Message> {
+        log::info!("Installer.update({:?})", message);
         match message {
             Message::CreateWallet => {
                 self.steps = vec![
                     Welcome::default().into(),
-                    DefineDescriptor::new(self.network, self.signer.clone()).into(),
+                    DefineDescriptor::new(
+                        self.network,
+                        self.signer.clone(),
+                        self.context.hw_sender.clone(),
+                    )
+                    .into(),
                     BackupMnemonic::new(self.signer.clone()).into(),
                     BackupDescriptor::default().into(),
-                    RegisterDescriptor::new_create_wallet().into(),
+                    RegisterDescriptor::new_create_wallet(self.context.hw_sender.clone()).into(),
                     SelectBitcoindTypeStep::new().into(),
                     InternalBitcoindStep::new(&self.context.data_dir).into(),
                     DefineBitcoind::new().into(),
@@ -158,7 +165,12 @@ impl Installer {
             Message::ShareXpubs => {
                 self.steps = vec![
                     Welcome::default().into(),
-                    ShareXpubs::new(self.network, self.signer.clone()).into(),
+                    ShareXpubs::new(
+                        self.network,
+                        self.signer.clone(),
+                        self.context.hw_sender.clone(),
+                    )
+                    .into(),
                 ];
                 self.next()
             }
@@ -167,7 +179,7 @@ impl Installer {
                     Welcome::default().into(),
                     ImportDescriptor::new(self.network).into(),
                     RecoverMnemonic::default().into(),
-                    RegisterDescriptor::new_import_wallet().into(),
+                    RegisterDescriptor::new_import_wallet(self.context.hw_sender.clone()).into(),
                     SelectBitcoindTypeStep::new().into(),
                     InternalBitcoindStep::new(&self.context.data_dir).into(),
                     DefineBitcoind::new().into(),

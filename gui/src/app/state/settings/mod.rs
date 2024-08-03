@@ -1,9 +1,9 @@
 mod bitcoind;
 mod wallet;
 
-use std::convert::From;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{convert::From, sync::mpsc};
 
 use iced::Command;
 
@@ -12,6 +12,7 @@ use liana_ui::widget::Element;
 use bitcoind::BitcoindSettingsState;
 use wallet::WalletSettingsState;
 
+use crate::hw::HwMessage;
 use crate::{
     app::{cache::Cache, error::Error, message::Message, state::State, view, wallet::Wallet},
     daemon::{Daemon, DaemonBackend},
@@ -23,6 +24,7 @@ pub struct SettingsState {
     setting: Option<Box<dyn State>>,
     daemon_backend: DaemonBackend,
     internal_bitcoind: bool,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl SettingsState {
@@ -31,6 +33,7 @@ impl SettingsState {
         wallet: Arc<Wallet>,
         daemon_backend: DaemonBackend,
         internal_bitcoind: bool,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> Self {
         Self {
             data_dir,
@@ -38,6 +41,7 @@ impl SettingsState {
             setting: None,
             daemon_backend,
             internal_bitcoind,
+            hw_sender,
         }
     }
 }
@@ -76,7 +80,12 @@ impl State for SettingsState {
             }
             Message::View(view::Message::Settings(view::SettingsMessage::EditWalletSettings)) => {
                 self.setting = Some(
-                    WalletSettingsState::new(self.data_dir.clone(), self.wallet.clone()).into(),
+                    WalletSettingsState::new(
+                        self.data_dir.clone(),
+                        self.wallet.clone(),
+                        self.hw_sender.clone(),
+                    )
+                    .into(),
                 );
                 let wallet = self.wallet.clone();
                 self.setting

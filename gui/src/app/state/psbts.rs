@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use std::sync::Arc;
+use std::{str::FromStr, sync::mpsc};
 
 use iced::{Command, Subscription};
 
@@ -10,6 +10,7 @@ use liana_ui::{
 };
 
 use super::{psbt, State};
+use crate::hw::HwMessage;
 use crate::{
     app::{cache::Cache, error::Error, menu::Menu, message::Message, view, wallet::Wallet},
     daemon::{model::SpendTx, Daemon},
@@ -21,21 +22,24 @@ pub struct PsbtsPanel {
     spend_txs: Vec<SpendTx>,
     warning: Option<Error>,
     import_tx: Option<ImportPsbtModal>,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl PsbtsPanel {
-    pub fn new(wallet: Arc<Wallet>) -> Self {
+    pub fn new(wallet: Arc<Wallet>, hw_sender: mpsc::Sender<HwMessage>) -> Self {
         Self {
             wallet,
             spend_txs: Vec::new(),
             warning: None,
             selected_tx: None,
             import_tx: None,
+            hw_sender,
         }
     }
 
     pub fn preselect(&mut self, spend_tx: SpendTx) {
-        let psbt_state = psbt::PsbtState::new(self.wallet.clone(), spend_tx, true);
+        let psbt_state =
+            psbt::PsbtState::new(self.wallet.clone(), spend_tx, true, self.hw_sender.clone());
         self.selected_tx = Some(psbt_state);
         self.warning = None;
         self.import_tx = None;
@@ -95,7 +99,12 @@ impl State for PsbtsPanel {
             }
             Message::View(view::Message::Select(i)) => {
                 if let Some(tx) = self.spend_txs.get(i) {
-                    let tx = psbt::PsbtState::new(self.wallet.clone(), tx.clone(), true);
+                    let tx = psbt::PsbtState::new(
+                        self.wallet.clone(),
+                        tx.clone(),
+                        true,
+                        self.hw_sender.clone(),
+                    );
                     let cmd = tx.load(daemon);
                     self.selected_tx = Some(tx);
                     return cmd;

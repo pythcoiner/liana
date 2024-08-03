@@ -5,7 +5,7 @@ use super::Error;
 use crate::{
     bitcoind::{Bitcoind, ConfigField, RpcAuthType},
     download::Progress,
-    hw::HardwareWalletMessage,
+    hw::{HardwareWalletMessage, HwMessage},
 };
 use async_hwi::{DeviceKind, Version};
 
@@ -37,6 +37,13 @@ pub enum Message {
     WalletRegistered(Result<(Fingerprint, Option<[u8; 32]>), Error>),
     MnemonicWord(usize, String),
     ImportMnemonic(bool),
+    PollHw,
+}
+
+impl From<HwMessage> for Message {
+    fn from(_value: HwMessage) -> Self {
+        Message::PollHw
+    }
 }
 
 #[derive(Debug, Clone)]

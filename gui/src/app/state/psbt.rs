@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
 use iced::Subscription;
 
@@ -18,6 +18,7 @@ use liana_ui::{
     widget::Element,
 };
 
+use crate::hw::{poll_hw, HwMessage};
 use crate::{
     app::{
         cache::Cache,
@@ -92,10 +93,16 @@ pub struct PsbtState {
     pub warning: Option<Error>,
     pub labels_edited: LabelsEdited,
     pub action: Option<PsbtAction>,
+    pub hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl PsbtState {
-    pub fn new(wallet: Arc<Wallet>, tx: SpendTx, saved: bool) -> Self {
+    pub fn new(
+        wallet: Arc<Wallet>,
+        tx: SpendTx,
+        saved: bool,
+        hw_sender: mpsc::Sender<HwMessage>,
+    ) -> Self {
         Self {
             desc_policy: wallet.main_descriptor.policy(),
             wallet,
@@ -104,6 +111,7 @@ impl PsbtState {
             action: None,
             tx,
             saved,
+            hw_sender,
         }
     }
 
@@ -157,6 +165,7 @@ impl PsbtState {
                     cache.datadir_path.clone(),
                     cache.network,
                     self.saved,
+                    self.hw_sender.clone(),
                 );
                 let cmd = action.load(daemon);
                 self.action = Some(PsbtAction::Sign(action));
@@ -410,6 +419,7 @@ pub struct SignAction {
     signed: HashSet<Fingerprint>,
     is_saved: bool,
     display_modal: bool,
+    hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl SignAction {
@@ -419,6 +429,7 @@ impl SignAction {
         datadir_path: PathBuf,
         network: Network,
         is_saved: bool,
+        hw_sender: mpsc::Sender<HwMessage>,
     ) -> Self {
         Self {
             signing: HashSet::new(),
@@ -428,13 +439,17 @@ impl SignAction {
             signed,
             is_saved,
             display_modal: true,
+            hw_sender,
         }
     }
 }
 
 impl Action for SignAction {
-    fn subscription(&self) -> Subscription<Message> {
-        self.hws.refresh().map(Message::HardwareWallets)
+    fn load(&self, _daemon: Arc<dyn Daemon + Sync + Send>) -> Command<Message> {
+        Command::perform(
+            poll_hw(self.hw_sender.clone(), crate::hw::Destination::Psbt),
+            From::from,
+        )
     }
 
     fn update(
@@ -521,6 +536,12 @@ impl Action for SignAction {
                     self.error = Some(e.into());
                 }
             },
+            Message::PollHw => {
+                return Command::perform(
+                    poll_hw(self.hw_sender.clone(), crate::hw::Destination::Psbt),
+                    From::from,
+                );
+            }
             _ => {}
         };
         Command::none()
@@ -808,7 +829,8 @@ mod tests {
             ),
         ]);
         let wallet = Arc::new(Wallet::new(LianaDescriptor::from_str(DESC).unwrap()));
-        let sandbox: Sandbox<PsbtsPanel> = Sandbox::new(PsbtsPanel::new(wallet.clone()));
+        let (hw_sender, _) = mpsc::channel();
+        let sandbox: Sandbox<PsbtsPanel> = Sandbox::new(PsbtsPanel::new(wallet.clone(), hw_sender));
         let client = Arc::new(Lianad::new(daemon.run()));
         let cache = Cache::default();
         let sandbox = sandbox

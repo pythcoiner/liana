@@ -1,7 +1,8 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::{path::PathBuf, sync::mpsc};
 
+use crate::hw::HwMessage;
 use crate::{
     app::{
         settings::{KeySetting, Settings, WalletSetting},
@@ -34,10 +35,15 @@ pub struct Context {
     pub bitcoind_is_external: bool,
     pub internal_bitcoind_config: Option<InternalBitcoindConfig>,
     pub internal_bitcoind: Option<Bitcoind>,
+    pub hw_sender: mpsc::Sender<HwMessage>,
 }
 
 impl Context {
-    pub fn new(network: bitcoin::Network, data_dir: PathBuf) -> Self {
+    pub fn new(
+        network: bitcoin::Network,
+        data_dir: PathBuf,
+        hw_sender: mpsc::Sender<HwMessage>,
+    ) -> Self {
         Self {
             bitcoin_config: BitcoinConfig {
                 network,
@@ -53,6 +59,7 @@ impl Context {
             bitcoind_is_external: true,
             internal_bitcoind_config: None,
             internal_bitcoind: None,
+            hw_sender,
         }
     }
 
