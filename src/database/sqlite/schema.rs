@@ -188,6 +188,7 @@ pub struct DbCoin {
     pub amount: bitcoin::Amount,
     pub derivation_index: bip32::ChildNumber,
     pub is_change: bool,
+    pub from_self: Option<bool>,
     pub spend_txid: Option<bitcoin::Txid>,
     pub spend_block: Option<DbBlockInfo>,
 }
@@ -229,6 +230,7 @@ impl TryFrom<&rusqlite::Row<'_>> for DbCoin {
         });
 
         let is_immature: bool = row.get(12)?;
+        let from_self: Option<bool> = row.get(13)?;
 
         Ok(DbCoin {
             id,
@@ -239,6 +241,7 @@ impl TryFrom<&rusqlite::Row<'_>> for DbCoin {
             amount,
             derivation_index,
             is_change,
+            from_self,
             spend_txid,
             spend_block,
         })
