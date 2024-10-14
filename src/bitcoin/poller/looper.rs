@@ -1,6 +1,6 @@
 use crate::{
     bitcoin::{BitcoinInterface, BlockChainTip, UTxO, UTxOAddress},
-    database::{Coin, DatabaseConnection, DatabaseInterface},
+    database::{Coin, CoinStatus, DatabaseConnection, DatabaseInterface},
     descriptors,
 };
 
@@ -192,6 +192,27 @@ fn add_txs_to_db(
     }
 }
 
+fn process_from_self(coins: &mut UpdatedCoins, db_conn: &mut Box<dyn DatabaseConnection>) {
+    for coin in &mut coins.received {
+        let txid = vec![coin.outpoint.txid];
+        let owned_coins = db_conn.coins(CoinStatus::all().as_slice(), &[]);
+        let txs = db_conn.list_wallet_transactions(txid.as_slice());
+        if !txs.is_empty() {
+            let tx = &txs[0].0;
+            // if all input are owned we consider the coins to be `from_self`
+            for inp in &tx.input {
+                if !owned_coins.contains_key(&inp.previous_output) {
+                    coin.from_self = Some(false);
+                }
+                coin.from_self = Some(true);
+            }
+        } else {
+            // TODO: should we error there?
+            coin.from_self = Some(false);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum TipUpdate {
     // The best block is still the same as in the previous poll.
@@ -297,7 +318,7 @@ fn updates(
 
     // Then check the state of our coins. Do it even if the tip did not change since last poll, as
     // we may have unconfirmed transactions.
-    let updated_coins = update_coins(bit, db_conn, &current_tip, descs, secp);
+    let mut updated_coins = update_coins(bit, db_conn, &current_tip, descs, secp);
 
     // If the tip changed while we were polling our Bitcoin interface, start over.
     if bit.chain_tip() != latest_tip {
@@ -307,6 +328,10 @@ fn updates(
 
     // Transactions must be added to the DB before coins due to foreign key constraints.
     add_txs_to_db(bit, db_conn, &updated_coins);
+
+    // After adding txs to db we can figure out whether coins are from self
+    process_from_self(&mut updated_coins, db_conn);
+
     // The chain tip did not change since we started our updates. Record them and the latest tip.
     // Having the tip in database means that, as far as the chain is concerned, we've got all
     // updates up to this block. But not more.

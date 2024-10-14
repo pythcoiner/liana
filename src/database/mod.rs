@@ -448,6 +448,15 @@ impl CoinStatus {
             CoinStatus::Spent => "spent",
         }
     }
+
+    pub fn all() -> Vec<CoinStatus> {
+        vec![
+            CoinStatus::Unconfirmed,
+            CoinStatus::Confirmed,
+            CoinStatus::Spending,
+            CoinStatus::Spent,
+        ]
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

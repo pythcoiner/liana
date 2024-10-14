@@ -447,8 +447,8 @@ impl SqliteConn {
             for coin in coins {
                 let deriv_index: u32 = coin.derivation_index.into();
                 db_tx.execute(
-                    "INSERT INTO coins (wallet_id, txid, vout, amount_sat, derivation_index, is_change, is_immature) \
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    "INSERT INTO coins (wallet_id, txid, vout, amount_sat, derivation_index, is_change, is_immature, from_self) \
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     rusqlite::params![
                         WALLET_ID,
                         coin.outpoint.txid[..].to_vec(),
@@ -457,6 +457,7 @@ impl SqliteConn {
                         deriv_index,
                         coin.is_change,
                         coin.is_immature,
+                        coin.from_self,
                     ],
                 )?;
             }

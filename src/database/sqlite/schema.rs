@@ -56,6 +56,7 @@ CREATE TABLE coins (
     spend_block_height INTEGER,
     spend_block_time INTEGER,
     is_immature BOOLEAN NOT NULL CHECK (is_immature IN (0,1)),
+    from_self BOOLEAN,
     UNIQUE (txid, vout),
     FOREIGN KEY (wallet_id) REFERENCES wallets (id)
         ON UPDATE RESTRICT
