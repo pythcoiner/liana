@@ -43,6 +43,8 @@ use miniscript::bitcoin::{
     secp256k1,
 };
 
+use self::schema::DbTransaction;
+
 const DB_VERSION: i64 = 5;
 
 /// Last database version for which Bitcoin transactions were not stored in database. In practice
@@ -447,8 +449,8 @@ impl SqliteConn {
             for coin in coins {
                 let deriv_index: u32 = coin.derivation_index.into();
                 db_tx.execute(
-                    "INSERT INTO coins (wallet_id, txid, vout, amount_sat, derivation_index, is_change, is_immature) \
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    "INSERT INTO coins (wallet_id, txid, vout, amount_sat, derivation_index, is_change, is_immature, from_self) \
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     rusqlite::params![
                         WALLET_ID,
                         coin.outpoint.txid[..].to_vec(),
@@ -457,6 +459,7 @@ impl SqliteConn {
                         deriv_index,
                         coin.is_change,
                         coin.is_immature,
+                        coin.from_self,
                     ],
                 )?;
             }
@@ -727,6 +730,34 @@ impl SqliteConn {
             Ok(())
         })
         .expect("Database must be available")
+    }
+
+    pub fn get_transaction(&mut self, txid: &bitcoin::Txid) -> Option<DbTransaction> {
+        // format!("x'{}'", FrontwardHexTxid(*txid)))
+        let query = format!(
+            "SELECT t.tx FROM transactions t WHERE t.txid = x'{}'",
+            FrontwardHexTxid(*txid)
+        );
+        let txs: Vec<DbTransaction> =
+            db_query(&mut self.conn, &query, rusqlite::params![], |row| {
+                row.try_into()
+            })
+            .expect("Db must not fail");
+        if !txs.is_empty() {
+            Some(txs[0].to_owned())
+        } else {
+            None
+        }
+    }
+
+    pub fn list_all_transactions(&mut self) -> Vec<DbTransaction> {
+        let query = "SELECT tx FROM transactions".to_string();
+        let txs: Vec<DbTransaction> =
+            db_query(&mut self.conn, &query, rusqlite::params![], |row| {
+                row.try_into()
+            })
+            .expect("Db must not fail");
+        txs
     }
 
     pub fn list_wallet_transactions(

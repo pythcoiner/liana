@@ -1,6 +1,6 @@
 use crate::{
     bitcoin::{BitcoinInterface, BlockChainTip, UTxO, UTxOAddress},
-    database::{Coin, DatabaseConnection, DatabaseInterface},
+    database::{Coin, CoinStatus, DatabaseConnection, DatabaseInterface},
     descriptors,
 };
 
@@ -192,6 +192,27 @@ fn add_txs_to_db(
     }
 }
 
+fn process_from_self(coins: &mut UpdatedCoins, db_conn: &mut Box<dyn DatabaseConnection>) {
+    for coin in &mut coins.received {
+        let txid = coin.outpoint.txid;
+        let owned_coins = db_conn.coins(CoinStatus::all().as_slice(), &[]);
+        let vec_coins = owned_coins.keys().collect::<Vec<_>>();
+        log::info!("owned_coins: {:#?}", vec_coins);
+        if let Some(tx) = db_conn.get_transaction(&txid) {
+            // if all input are owned we consider the coins to be `from_self`
+            for inp in &tx.input {
+                if !owned_coins.contains_key(&inp.previous_output) {
+                    coin.from_self = Some(false);
+                    break;
+                }
+                coin.from_self = Some(true);
+            }
+        } else {
+            coin.from_self = Some(false);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum TipUpdate {
     // The best block is still the same as in the previous poll.
@@ -307,6 +328,10 @@ fn updates(
 
     // Transactions must be added to the DB before coins due to foreign key constraints.
     add_txs_to_db(bit, db_conn, &updated_coins);
+
+    // After adding txs to db we can figure out whether coins are from self
+    process_from_self(&mut updated_coins, db_conn);
+
     // The chain tip did not change since we started our updates. Record them and the latest tip.
     // Having the tip in database means that, as far as the chain is concerned, we've got all
     // updates up to this block. But not more.

@@ -641,6 +641,8 @@ impl Daemon for BackendWalletClient {
                     block_height: c.block_height,
                     is_immature: c.is_immature,
                     is_change: c.is_change_address,
+                    // TODO: get from remote backend
+                    from_self: Some(c.is_change_address),
                     spend_info: c.spend_info.map(|info| LCSpendInfo {
                         txid: info.txid,
                         height: info.height,
@@ -1125,6 +1127,8 @@ fn history_tx_from_api(value: api::Transaction, network: Network) -> HistoryTran
                     block_height: c.block_height,
                     is_immature: c.is_immature,
                     is_change: c.is_change_address,
+                    // TODO: get from remote backend
+                    from_self: Some(c.is_change_address),
                     spend_info: c.spend_info.clone().map(|info| LCSpendInfo {
                         txid: info.txid,
                         height: info.height,
@@ -1180,6 +1184,8 @@ fn spend_tx_from_api(
                     block_height: c.block_height,
                     is_immature: c.is_immature,
                     is_change: c.is_change_address,
+                    // TODO: get from remote backend
+                    from_self: Some(c.is_change_address),
                     spend_info: c.spend_info.clone().map(|info| LCSpendInfo {
                         txid: info.txid,
                         height: info.height,

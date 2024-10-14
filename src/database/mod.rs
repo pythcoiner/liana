@@ -20,7 +20,7 @@ use std::{
     sync,
 };
 
-use miniscript::bitcoin::{self, bip32, psbt::Psbt, secp256k1};
+use miniscript::bitcoin::{self, bip32, psbt::Psbt, secp256k1, Transaction};
 
 pub trait DatabaseInterface: Send {
     fn connection(&self) -> Box<dyn DatabaseConnection>;
@@ -158,6 +158,10 @@ pub trait DatabaseConnection {
         &mut self,
         txids: &[bitcoin::Txid],
     ) -> Vec<(bitcoin::Transaction, Option<i32>, Option<u32>)>;
+
+    fn list_all_transactions(&mut self) -> Vec<Transaction>;
+
+    fn get_transaction(&mut self, txid: &bitcoin::Txid) -> Option<Transaction>;
 }
 
 impl DatabaseConnection for SqliteConn {
@@ -331,6 +335,17 @@ impl DatabaseConnection for SqliteConn {
         self.new_txs(txs)
     }
 
+    fn get_transaction(&mut self, txid: &bitcoin::Txid) -> Option<Transaction> {
+        self.get_transaction(txid).map(|tx| tx.transaction)
+    }
+
+    fn list_all_transactions(&mut self) -> Vec<Transaction> {
+        self.list_all_transactions()
+            .into_iter()
+            .map(|tx| tx.transaction)
+            .collect()
+    }
+
     fn list_wallet_transactions(
         &mut self,
         txids: &[bitcoin::Txid],
@@ -447,6 +462,15 @@ impl CoinStatus {
             CoinStatus::Spending => "spending",
             CoinStatus::Spent => "spent",
         }
+    }
+
+    pub fn all() -> Vec<CoinStatus> {
+        vec![
+            CoinStatus::Unconfirmed,
+            CoinStatus::Confirmed,
+            CoinStatus::Spending,
+            CoinStatus::Spent,
+        ]
     }
 }
 
