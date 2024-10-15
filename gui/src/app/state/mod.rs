@@ -10,7 +10,7 @@ mod transactions;
 
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use iced::{Command, Subscription};
 use liana::{
@@ -156,6 +156,7 @@ impl State for Home {
             Message::Coins(res) => match res {
                 Err(e) => self.warning = Some(e),
                 Ok(coins) => {
+                    let start = Instant::now();
                     self.warning = None;
                     self.balance = Amount::from_sat(0);
                     self.unconfirmed_balance = Amount::from_sat(0);
@@ -185,20 +186,26 @@ impl State for Home {
                             }
                         }
                     }
+                    let dur = Instant::now() - start;
+                    log::info!("Home.updtate() => Coins duration: {:?}", dur);
                 }
             },
             Message::HistoryTransactions(res) => match res {
                 Err(e) => self.warning = Some(e),
                 Ok(events) => {
+                    let start = Instant::now();
                     self.warning = None;
                     self.events = events;
                     self.events.sort_by(|a, b| b.time.cmp(&a.time));
                     self.is_last_page = (self.events.len() as u64) < HISTORY_EVENT_PAGE_SIZE;
+                    let dur = Instant::now() - start;
+                    log::info!("Home.updtate() => HistoryTransactions duration: {:?}", dur);
                 }
             },
             Message::HistoryTransactionsExtension(res) => match res {
                 Err(e) => self.warning = Some(e),
                 Ok(events) => {
+                    let start = Instant::now();
                     self.processing = false;
                     self.warning = None;
                     self.is_last_page = (events.len() as u64) < HISTORY_EVENT_PAGE_SIZE;
@@ -208,6 +215,11 @@ impl State for Home {
                         }
                     }
                     self.events.sort_by(|a, b| b.time.cmp(&a.time));
+                    let dur = Instant::now() - start;
+                    log::info!(
+                        "Home.updtate() => HistoryTransactionsExtension duration: {:?}",
+                        dur
+                    );
                 }
             },
             Message::PendingTransactions(res) => match res {
