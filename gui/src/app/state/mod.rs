@@ -156,6 +156,7 @@ impl State for Home {
             Message::Coins(res) => match res {
                 Err(e) => self.warning = Some(e),
                 Ok(coins) => {
+                    log::info!("Home.update(): {:#?}", coins);
                     self.warning = None;
                     self.balance = Amount::from_sat(0);
                     self.unconfirmed_balance = Amount::from_sat(0);
@@ -180,7 +181,7 @@ impl State for Home {
                                 } else {
                                     self.remaining_sequence = Some(seq);
                                 }
-                            } else if coin.is_change {
+                            } else if let Some(true) = coin.from_self {
                                 self.balance += coin.amount;
                             } else {
                                 self.unconfirmed_balance += coin.amount;

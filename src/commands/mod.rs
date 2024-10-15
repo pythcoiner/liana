@@ -421,6 +421,7 @@ impl DaemonControl {
                     spend_block,
                     is_immature,
                     is_change,
+                    from_self,
                     derivation_index,
                     ..
                 } = coin;
@@ -441,6 +442,7 @@ impl DaemonControl {
                     spend_info,
                     is_immature,
                     is_change,
+                    from_self,
                 }
             })
             .collect();
@@ -1197,6 +1199,8 @@ pub struct ListCoinsEntry {
     pub is_immature: bool,
     /// Whether the coin deposit address was derived from the change descriptor.
     pub is_change: bool,
+    /// Whether this coin ancestors are owned by the wallet
+    pub from_self: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

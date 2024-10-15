@@ -194,20 +194,24 @@ fn add_txs_to_db(
 
 fn process_from_self(coins: &mut UpdatedCoins, db_conn: &mut Box<dyn DatabaseConnection>) {
     for coin in &mut coins.received {
-        let txid = vec![coin.outpoint.txid];
+        let txid = coin.outpoint.txid;
         let owned_coins = db_conn.coins(CoinStatus::all().as_slice(), &[]);
-        let txs = db_conn.list_wallet_transactions(txid.as_slice());
-        if !txs.is_empty() {
-            let tx = &txs[0].0;
+        log::info!("owned_coins: {:#?}", owned_coins);
+        if let Some(tx) = db_conn.get_transaction(&txid) {
             // if all input are owned we consider the coins to be `from_self`
             for inp in &tx.input {
                 if !owned_coins.contains_key(&inp.previous_output) {
                     coin.from_self = Some(false);
+                    log::error!("coin {:?} not owned", inp.previous_output);
                 }
                 coin.from_self = Some(true);
             }
         } else {
-            // TODO: should we error there?
+            log::error!(
+                "process_from_self(): tx fumding {:?} not in db!",
+                coin.outpoint
+            );
+            log::error!("saved txids: {:#?}", db_conn.list_saved_txids());
             coin.from_self = Some(false);
         }
     }

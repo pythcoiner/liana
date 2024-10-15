@@ -43,6 +43,8 @@ use miniscript::bitcoin::{
     secp256k1,
 };
 
+use self::schema::DbTransaction;
+
 const DB_VERSION: i64 = 5;
 
 /// Last database version for which Bitcoin transactions were not stored in database. In practice
@@ -728,6 +730,31 @@ impl SqliteConn {
             Ok(())
         })
         .expect("Database must be available")
+    }
+
+    pub fn get_transaction(&mut self, txid: &bitcoin::Txid) -> Option<DbTransaction> {
+        // let query = "SELECT t.tx FROM transactions t WHERE".to_string();
+        let query = format!("SELECT t.tx FROM transactions t WHERE txid = {}", txid);
+        let txs: Vec<DbTransaction> =
+            db_query(&mut self.conn, &query, rusqlite::params![], |row| {
+                row.try_into()
+            })
+            .expect("Db must not fail");
+        if !txs.is_empty() {
+            Some(txs[0].to_owned())
+        } else {
+            None
+        }
+    }
+
+    pub fn list_all_transactions(&mut self) -> Vec<DbTransaction> {
+        let query = "SELECT t.tx FROM transactions t".to_string();
+        let txs: Vec<DbTransaction> =
+            db_query(&mut self.conn, &query, rusqlite::params![], |row| {
+                row.try_into()
+            })
+            .expect("Db must not fail");
+        txs
     }
 
     pub fn list_wallet_transactions(
