@@ -88,6 +88,7 @@ fn update_coins(
                 amount,
                 derivation_index,
                 is_change,
+                from_self: None,
                 block_info: None,
                 spend_txid: None,
                 spend_block: None,

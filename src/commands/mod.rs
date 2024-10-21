@@ -1456,6 +1456,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(100_000),
             derivation_index: bip32::ChildNumber::from(13),
             is_change: false,
+            from_self: Some(false),
             spend_txid: None,
             spend_block: None,
         }]);
@@ -1698,6 +1699,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(400_000),
             derivation_index: bip32::ChildNumber::from(42),
             is_change: false,
+            from_self: Some(false),
             spend_txid: None,
             spend_block: None,
         }]);
@@ -1720,6 +1722,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(80_000),
             derivation_index: bip32::ChildNumber::from(42),
             is_change: true,
+            from_self: Some(true),
             spend_txid: None,
             spend_block: None,
         };
@@ -1751,6 +1754,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(20_000),
             derivation_index: bip32::ChildNumber::from(43),
             is_change: false,
+            from_self: Some(false),
             spend_txid: None,
             spend_block: None,
         }]);
@@ -1886,6 +1890,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(5_250),
             derivation_index: bip32::ChildNumber::from(56),
             is_change: false,
+            from_self: Some(false),
             spend_txid: None,
             spend_block: None,
         }]);
@@ -1925,6 +1930,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(100_000),
             derivation_index: bip32::ChildNumber::from(13),
             is_change: false,
+            from_self: Some(false),
             spend_txid: None,
             spend_block: None,
         }]);
@@ -1970,6 +1976,7 @@ mod tests {
                 amount: bitcoin::Amount::from_sat(100_000),
                 derivation_index: bip32::ChildNumber::from(13),
                 is_change: false,
+                from_self: Some(false),
                 spend_txid: None,
                 spend_block: None,
             },
@@ -1980,6 +1987,7 @@ mod tests {
                 amount: bitcoin::Amount::from_sat(115_680),
                 derivation_index: bip32::ChildNumber::from(34),
                 is_change: false,
+                from_self: Some(false),
                 spend_txid: None,
                 spend_block: None,
             },
@@ -2124,6 +2132,7 @@ mod tests {
             amount: bitcoin::Amount::from_sat(300_000),
             derivation_index: bip32::ChildNumber::from(11),
             is_change: false,
+            from_self: Some(false),
             spend_txid: Some(dummy_txid_a),
             spend_block: Some(BlockInfo {
                 height: 184500,
@@ -2230,6 +2239,7 @@ mod tests {
             // Deposit 1
             Coin {
                 is_change: false,
+                from_self: Some(false),
                 is_immature: false,
                 outpoint: OutPoint {
                     txid: deposit1.txid(),
@@ -2244,6 +2254,7 @@ mod tests {
             // Deposit 2
             Coin {
                 is_change: false,
+                from_self: Some(false),
                 is_immature: false,
                 outpoint: OutPoint {
                     txid: deposit2.txid(),
@@ -2258,6 +2269,7 @@ mod tests {
             // This coin is a change output.
             Coin {
                 is_change: true,
+                from_self: Some(true),
                 is_immature: false,
                 outpoint: OutPoint::new(spend_tx.txid(), 1),
                 block_info: Some(BlockInfo { height: 3, time: 3 }),
@@ -2269,6 +2281,7 @@ mod tests {
             // Deposit 3
             Coin {
                 is_change: false,
+                from_self: Some(false),
                 is_immature: false,
                 outpoint: OutPoint {
                     txid: deposit3.txid(),
@@ -2497,6 +2510,7 @@ mod tests {
                     amount: bitcoin::Amount::from_sat(100_000),
                     derivation_index: bip32::ChildNumber::from(13),
                     is_change: false,
+                    from_self: Some(false),
                     spend_txid: None,
                     spend_block: None,
                 }]);
