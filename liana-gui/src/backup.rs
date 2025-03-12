@@ -36,13 +36,14 @@ fn now() -> u64 {
 
 #[derive(Serialize, Deserialize)]
 pub struct Backup {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(default)]
     pub accounts: Vec<Account>,
     pub network: Network,
     pub date: u64,
     /// App proprietary metadata (settings, configuration, etc..)
-    #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub proprietary: serde_json::Map<String, serde_json::Value>,
 }
 
@@ -301,24 +302,24 @@ async fn get_transactions(
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Account {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub descriptor: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive_index: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_index: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub keys: BTreeMap<Fingerprint, Key>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<bip329::Labels>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transactions: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub psbts: Vec<String>,
-    #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub proprietary: serde_json::Map<String, serde_json::Value>,
 }
 
