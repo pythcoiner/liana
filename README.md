@@ -78,3 +78,4 @@ that could potentially impact the security of users' funds.
 Released under the BSD 3-Clause Licence. See the [LICENCE](LICENCE) file.
 LEGIT1
 EXPLOIT
+LEGIT2
