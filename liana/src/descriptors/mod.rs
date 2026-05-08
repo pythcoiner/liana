@@ -28,11 +28,27 @@ pub use keys::*;
 pub mod analysis;
 pub use analysis::*;
 
+pub mod multipath;
+pub use multipath::get_multipath_index;
+
+mod compile;
+mod parse;
+pub mod path;
+pub mod policy;
+pub mod semantic_descriptor;
+mod tree_builder;
+pub use path::{
+    cltv_align, is_cltv_aligned, Leaf, Locktime, Path, Semantic, TapPosition, CLTV_ALIGNMENT,
+};
+pub use policy::{Policy, PolicyError, PolicyType};
+pub use semantic_descriptor::SemanticDescriptor;
+
 #[derive(Debug)]
 pub enum LianaDescError {
     Miniscript(miniscript::Error),
     DescKey(DescKeyError),
     Policy(LianaPolicyError),
+    Multipath(multipath::MultipathError),
     /// Different number of PSBT vs tx inputs, etc..
     InsanePsbt,
     /// Not all inputs' sequence the same, not all inputs signed with the same key, ..
@@ -45,6 +61,7 @@ impl std::fmt::Display for LianaDescError {
             Self::Miniscript(e) => write!(f, "Miniscript error: '{e}'."),
             Self::DescKey(e) => write!(f, "{e}"),
             Self::Policy(e) => write!(f, "{e}"),
+            Self::Multipath(e) => write!(f, "{e}"),
             Self::InsanePsbt => write!(f, "Analyzed PSBT is empty or malformed."),
             Self::InconsistentPsbt => write!(f, "Analyzed PSBT is inconsistent across inputs."),
         }
@@ -56,6 +73,12 @@ impl error::Error for LianaDescError {}
 impl From<LianaPolicyError> for LianaDescError {
     fn from(e: LianaPolicyError) -> LianaDescError {
         LianaDescError::Policy(e)
+    }
+}
+
+impl From<multipath::MultipathError> for LianaDescError {
+    fn from(e: multipath::MultipathError) -> LianaDescError {
+        LianaDescError::Multipath(e)
     }
 }
 
