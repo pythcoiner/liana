@@ -23,8 +23,22 @@ use super::INSTALLER_STEPS;
 /// Main registration view
 pub fn registration_view(state: &State) -> Element<'_, Msg> {
     let reg_state = &state.views.registration;
+    let list_content = if !reg_state.has_visible_devices() {
+        no_devices_view()
+    } else {
+        device_list_view(state)
+    };
+    registration_view_with_cards(state, list_content, reg_state.has_visible_devices())
+}
 
-    // Get org name and wallet name from backend
+/// Variant of [`registration_view`] that takes a pre-built device-list element.
+/// The production view computes its list from `state.views.registration.user_devices`;
+/// the debug gallery passes a custom list of `key_card` variants.
+pub(crate) fn registration_view_with_cards<'a>(
+    state: &'a State,
+    list_content: Element<'a, Msg>,
+    _has_devices: bool,
+) -> Element<'a, Msg> {
     let org_name = state
         .app
         .selected_org
@@ -39,10 +53,8 @@ pub fn registration_view(state: &State) -> Element<'_, Msg> {
         .unwrap_or_else(|| "Wallet".to_string());
     let breadcrumb = vec![org_name, wallet_name, "Register Devices".to_string()];
 
-    // Get current user email
     let current_user_email = &state.views.login.email.form.value;
 
-    // Header content
     let header_content = screen_intro(
         "Register",
         Some(intro_description(
@@ -50,14 +62,7 @@ pub fn registration_view(state: &State) -> Element<'_, Msg> {
         )),
     );
 
-    // List content: device cards or info message
-    let list_content = if !reg_state.has_visible_devices() {
-        no_devices_view()
-    } else {
-        device_list_view(state)
-    };
-
-    let pinned_content = Some({
+    let pinned_content = Some(
         Container::new(btn_skip_registration(Some(Msg::RegistrationSkipAll)))
             .padding(iced::Padding {
                 right: 20.0,
@@ -66,8 +71,8 @@ pub fn registration_view(state: &State) -> Element<'_, Msg> {
                 ..iced::Padding::ZERO
             })
             .width(Length::Fill)
-            .into()
-    });
+            .into(),
+    );
 
     layout_with_scrollable_list(
         (7, INSTALLER_STEPS),

@@ -96,7 +96,7 @@ fn select_view<'a>(state: &'a State, modal_state: &'a XpubEntryModalState) -> El
     )
 }
 
-fn details_view<'a>(modal_state: &'a XpubEntryModalState) -> Element<'a, Msg> {
+pub(crate) fn details_view<'a>(modal_state: &'a XpubEntryModalState) -> Element<'a, Msg> {
     let source = modal_state.input_source.as_ref().and_then(source_line);
     let fetching_label: Option<Element<'_, Msg>> = modal_state.processing.then(|| {
         text::new::caption("Fetching from device...")
