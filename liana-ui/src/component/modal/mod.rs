@@ -410,3 +410,33 @@ where
     let msg = on_press.map(|f| f());
     button::device(col, msg)
 }
+
+pub fn show_qr_code<'a, M: 'a + 'static>(
+    tt: Option<&'static str>,
+    msg: Option<M>,
+) -> Button<'a, M> {
+    let mut btn = Button::new(
+        Row::new()
+            .push(icon::qr_icon().size(30))
+            .push(text::p1_regular("Show QR Code"))
+            .push_maybe(tt.map(tooltip))
+            .spacing(20)
+            .align_y(Vertical::Center)
+            .padding(15),
+    )
+    .style(theme::button::secondary)
+    .width(Length::Fill);
+    if let Some(msg) = msg {
+        btn = btn.on_press(msg);
+    }
+    btn
+}
+
+pub fn modal_no_devices_placeholder<'a, M: 'a>() -> Element<'a, M> {
+    Column::new()
+        .push(icon::usb_icon().size(100))
+        .push(text::p1_regular("Plug in a hardware device ..."))
+        .align_x(Horizontal::Center)
+        .spacing(20)
+        .into()
+}
