@@ -38,7 +38,10 @@ fn address_card<'a>(
         Message::Label(vec![addr.clone()], super::LabelMessage::Edit),
         Message::Clipboard(addr),
         Message::Select(row_index),
-        Message::ShowQrCode(row_index),
+        Message::ShowAddressQrCode {
+            row_index: Some(row_index),
+            address: None,
+        },
     )
 }
 
