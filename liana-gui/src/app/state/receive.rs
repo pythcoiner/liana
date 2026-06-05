@@ -267,25 +267,37 @@ impl State for ReceivePanel {
                     };
                     self.modal = Modal::None;
                     if let Some((address, index, label)) = finish {
-                        let key = LabelItem::Address(address.clone()).to_string();
-                        self.prev_addresses.list.insert(0, address.clone());
-                        self.prev_addresses.derivation_indexes.insert(0, index);
-                        self.prev_addresses.labels.insert(key, label.clone());
-                        let updated = HashMap::from([(LabelItem::Address(address), Some(label))]);
+                        let updated = HashMap::from([(
+                            LabelItem::Address(address.clone()),
+                            Some(label.clone()),
+                        )]);
                         return Task::perform(
                             async move {
                                 daemon
                                     .update_labels(&updated)
                                     .await
-                                    .map(|_| HashMap::new())
+                                    .map(|_| (address, index, label))
                                     .map_err(|e| e.into())
                             },
-                            Message::LabelsUpdated,
+                            Message::NewAddressSaved,
                         );
                     }
                     Task::none()
                 }
             },
+            Message::NewAddressSaved(res) => {
+                match res {
+                    Ok((address, index, label)) => {
+                        self.warning = None;
+                        let key = LabelItem::Address(address.clone()).to_string();
+                        self.prev_addresses.list.insert(0, address);
+                        self.prev_addresses.derivation_indexes.insert(0, index);
+                        self.prev_addresses.labels.insert(key, label);
+                    }
+                    Err(e) => self.warning = Some(e),
+                }
+                Task::none()
+            }
             Message::View(view::Message::Close) => {
                 // Closing a stacked sub-modal returns to the show-address modal.
                 if let Modal::NewAddress(m) = &mut self.modal {
@@ -651,6 +663,7 @@ mod tests {
         daemon::{
             client::{Lianad, Request},
             model::*,
+            DaemonError,
         },
         utils::{mock::Daemon, sandbox::Sandbox},
     };
@@ -736,6 +749,81 @@ mod tests {
 
         let panel = sandbox.state();
         assert_eq!(panel.prev_addresses.list, vec![addr]);
+        assert!(matches!(panel.modal, Modal::None));
+    }
+
+    #[tokio::test]
+    async fn test_receive_panel_update_labels_failure() {
+        let addr =
+            Address::from_str("tb1qkldgvljmjpxrjq2ev5qxe8dvhn0dph9q85pwtfkjeanmwdue2akqj4twxj")
+                .unwrap()
+                .assume_checked();
+        let daemon = Daemon::new(vec![
+            (
+                Some(
+                    json!({"method": "listrevealedaddresses", "params": [false, true, 20, Option::<ChildNumber>::None]}),
+                ),
+                Ok(json!(ListRevealedAddressesResult {
+                    addresses: vec![],
+                    continue_from: None,
+                })),
+            ),
+            (
+                Some(json!({"method": "getnewaddress", "params": Option::<Request>::None})),
+                Ok(json!(GetAddressResult::new(
+                    addr.clone(),
+                    ChildNumber::from_normal_idx(0).unwrap()
+                ))),
+            ),
+            (
+                None,
+                Err(DaemonError::Unexpected("update failed".to_string())),
+            ),
+        ]);
+        let wallet = Arc::new(Wallet::new(LianaDescriptor::from_str(DESC).unwrap()));
+        let sandbox: Sandbox<ReceivePanel> = Sandbox::new(ReceivePanel::new(
+            LianaDirectory::new(PathBuf::new()),
+            wallet.clone(),
+        ));
+        let client = Arc::new(Lianad::new(daemon.run()));
+        let cache = Cache::default();
+        let sandbox = sandbox.load(client.clone(), &cache, wallet).await;
+        let sandbox = sandbox
+            .update(
+                client.clone(),
+                &cache,
+                Message::View(viewMessage::NextReceiveAddress),
+            )
+            .await;
+        let sandbox = sandbox
+            .update(
+                client.clone(),
+                &cache,
+                Message::View(viewMessage::NewAddress(
+                    view::NewAddressMessage::LabelEdited("test".to_string()),
+                )),
+            )
+            .await;
+        let sandbox = sandbox
+            .update(
+                client.clone(),
+                &cache,
+                Message::View(viewMessage::NewAddress(view::NewAddressMessage::Confirm)),
+            )
+            .await;
+        let sandbox = sandbox
+            .update(
+                client,
+                &cache,
+                Message::View(viewMessage::NewAddress(view::NewAddressMessage::Close)),
+            )
+            .await;
+
+        let panel = sandbox.state();
+        assert!(panel.prev_addresses.list.is_empty());
+        assert!(panel.prev_addresses.derivation_indexes.is_empty());
+        assert!(panel.prev_addresses.labels.is_empty());
+        assert!(panel.warning.is_some());
         assert!(matches!(panel.modal, Modal::None));
     }
 }

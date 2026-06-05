@@ -38,6 +38,7 @@ pub enum Message {
     LoadWallet(Wallet),
     Info(Result<GetInfoResult, Error>),
     ReceiveAddress(Result<(Address, ChildNumber), Error>),
+    NewAddressSaved(Result<(Address, ChildNumber, String), Error>),
     /// Revealed addresses. The second element contains the start index used for the request.
     RevealedAddresses(
         Result<ListRevealedAddressesResult, Error>,
