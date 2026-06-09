@@ -251,13 +251,7 @@ impl State for ReceivePanel {
                                     LabelItem::Address(res.address.clone()),
                                     Some(label),
                                 )]);
-                                if let Err(e) = daemon.update_labels(&updates).await {
-                                    // FIXME: should we add a retry or error mechanism here?
-                                    tracing::warn!(
-                                        "failed to store label for {}: {e}",
-                                        res.address
-                                    );
-                                }
+                                daemon.update_labels(&updates).await?;
                                 Ok((res.address, res.derivation_index))
                             },
                             Message::ReceiveAddress,
@@ -774,11 +768,11 @@ mod tests {
 
     const DESC: &str = "wsh(or_d(multi(2,[ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/<0;1>/*,[de6eb005/48'/1'/0'/2']tpubDFGuYfS2JwiUSEXiQuNGdT3R7WTDhbaE6jbUhgYSSdhmfQcSx7ZntMPPv7nrkvAqjpj3jX9wbhSGMeKVao4qAzhbNyBi7iQmv5xxQk6H6jz/<0;1>/*),and_v(v:pkh([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/<2;3>/*),older(3))))#p9ax3xxp";
 
-    #[tokio::test]
-    async fn test_receive_panel() {
-        let wallet = Arc::new(Wallet::new(LianaDescriptor::from_str(DESC).unwrap()));
-        // The reveal returns the next receive address; derive the same one here to build
-        // the getnewaddress mock response.
+    fn wallet() -> Arc<Wallet> {
+        Arc::new(Wallet::new(LianaDescriptor::from_str(DESC).unwrap()))
+    }
+
+    fn receive_address(wallet: &Wallet) -> (Address, ChildNumber) {
         let secp = secp256k1::Secp256k1::verification_only();
         let index = ChildNumber::from_normal_idx(1).unwrap();
         let addr = wallet
@@ -786,6 +780,32 @@ mod tests {
             .receive_descriptor()
             .derive(index, &secp)
             .address(Network::Bitcoin);
+        (addr, index)
+    }
+
+    async fn open_new_address_modal(
+        wallet: Arc<Wallet>,
+        client: Arc<Lianad<crate::utils::mock::DaemonClient>>,
+        cache: &Cache,
+    ) -> Sandbox<ReceivePanel> {
+        let sandbox: Sandbox<ReceivePanel> = Sandbox::new(ReceivePanel::new(
+            LianaDirectory::new(PathBuf::new()),
+            wallet.clone(),
+        ));
+        let sandbox = sandbox.load(client.clone(), cache, wallet).await;
+        sandbox
+            .update(
+                client,
+                cache,
+                Message::View(viewMessage::NextReceiveAddress),
+            )
+            .await
+    }
+
+    #[tokio::test]
+    async fn test_receive_panel() {
+        let wallet = wallet();
+        let (addr, index) = receive_address(&wallet);
         let daemon = Daemon::new(vec![
             (
                 Some(
@@ -804,20 +824,9 @@ mod tests {
             // updatelabels: store the label on the revealed address.
             (None, Ok(json!(null))),
         ]);
-        let sandbox: Sandbox<ReceivePanel> = Sandbox::new(ReceivePanel::new(
-            LianaDirectory::new(PathBuf::new()),
-            wallet.clone(),
-        ));
         let client = Arc::new(Lianad::new(daemon.run()));
         let cache = Cache::default();
-        let sandbox = sandbox.load(client.clone(), &cache, wallet).await;
-        let sandbox = sandbox
-            .update(
-                client.clone(),
-                &cache,
-                Message::View(viewMessage::NextReceiveAddress),
-            )
-            .await;
+        let sandbox = open_new_address_modal(wallet, client.clone(), &cache).await;
 
         // Generating opens the modal at the mandatory-label step, without revealing or
         // displaying any address.
@@ -847,6 +856,7 @@ mod tests {
         // After the reveal, the address is recorded with its label and shown.
         let panel = sandbox.state();
         assert_eq!(panel.prev_addresses.list, vec![addr.clone()]);
+        assert_eq!(panel.prev_addresses.derivation_indexes, vec![index]);
         assert_eq!(
             panel.prev_addresses.labels.get(&addr.to_string()),
             Some(&"test".to_string())
@@ -855,5 +865,58 @@ mod tests {
             &panel.modal,
             Modal::NewAddress(m) if matches!(m.step, Step::Show { .. })
         ));
+    }
+
+    #[tokio::test]
+    async fn test_receive_panel_label_update_failure() {
+        let wallet = wallet();
+        let (addr, index) = receive_address(&wallet);
+        let daemon = Daemon::new(vec![
+            (
+                Some(
+                    json!({"method": "listrevealedaddresses", "params": [false, true, 20, Option::<ChildNumber>::None]}),
+                ),
+                Ok(json!(ListRevealedAddressesResult {
+                    addresses: vec![],
+                    continue_from: None,
+                })),
+            ),
+            (
+                Some(json!({"method": "getnewaddress", "params": Option::<Request>::None})),
+                Ok(json!(GetAddressResult::new(addr, index))),
+            ),
+            (
+                None,
+                Err(crate::daemon::DaemonError::Unexpected(
+                    "label update failed".to_string(),
+                )),
+            ),
+        ]);
+        let client = Arc::new(Lianad::new(daemon.run()));
+        let cache = Cache::default();
+        let sandbox = open_new_address_modal(wallet, client.clone(), &cache).await;
+        let sandbox = sandbox
+            .update(
+                client.clone(),
+                &cache,
+                Message::View(viewMessage::NewAddress(
+                    view::NewAddressMessage::LabelEdited("test".to_string()),
+                )),
+            )
+            .await;
+        let sandbox = sandbox
+            .update(
+                client,
+                &cache,
+                Message::View(viewMessage::NewAddress(view::NewAddressMessage::Confirm)),
+            )
+            .await;
+
+        let panel = sandbox.state();
+        assert!(panel.prev_addresses.list.is_empty());
+        assert!(panel.prev_addresses.derivation_indexes.is_empty());
+        assert!(panel.prev_addresses.labels.is_empty());
+        assert!(panel.warning.is_some());
+        assert!(matches!(panel.modal, Modal::None));
     }
 }
