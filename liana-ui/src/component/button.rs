@@ -469,6 +469,14 @@ pub fn btn_manage_keys<'a, T: Clone + 'a>(msg: Option<T>, primary: bool) -> Butt
     }
 }
 
+/// Generate-address button: a plus icon and "Generate address" label. Primary
+/// when there are no previous addresses yet, secondary otherwise.
+pub fn btn_generate_address<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
+    let icon = Some(icon::plus_icon());
+    let label = "Generate address";
+    btn_primary(icon, label, BtnWidth::Auto, msg)
+}
+
 pub fn btn_skip<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
     btn_secondary(None, "Skip", BtnWidth::XL, msg)
 }
