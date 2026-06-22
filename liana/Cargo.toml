@@ -12,6 +12,9 @@ description = "Liana development kit"
 # For managing transactions (it re-exports the bitcoin crate)
 miniscript = { workspace = true, features = ["serde", "compiler", "base64"] }
 
+# High-level descriptor-agnostic policy API (Policy / Path / Semantic / NUMS helpers).
+bup = { path = "/home/pyth/bup" }
+
 # Coin selection algorithms for spend transaction creation.
 bdk_coin_select = { workspace = true }
 # We use TOML for the config, and JSON for RPC

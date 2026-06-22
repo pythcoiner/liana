@@ -1,16 +1,14 @@
 //! `SemanticDescriptor`: top-level dispatcher between the legacy [`LianaDescriptor`] (WSH and
-//! legacy Tr Csv) and the new Tr-only [`Policy`] flow.
+//! legacy Tr Csv) and the new Tr-only [`bup::Policy`] flow.
 
 use std::str::FromStr;
 
+use bup::{Policy, PolicyError, PolicyType};
 use miniscript::{Descriptor, DescriptorPublicKey};
 
-use super::{
-    policy::{Policy, PolicyError, PolicyType},
-    LianaDescError, LianaDescriptor, LianaPolicyError,
-};
+use super::{LianaDescError, LianaDescriptor, LianaPolicyError};
 
-/// Wraps either today's `LianaDescriptor` (WSH or legacy Tr Csv) or the new `Policy`.
+/// Wraps either today's `LianaDescriptor` (WSH or legacy Tr Csv) or the new `bup::Policy`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum SemanticDescriptor {
@@ -37,7 +35,9 @@ impl SemanticDescriptor {
                 Policy::from_descriptor(&desc)
                     .map(SemanticDescriptor::Policy)
                     .map_err(|e| match e {
-                        PolicyError::Descriptor(d) => d,
+                        PolicyError::Miniscript(_) | PolicyError::Multipath(_) => {
+                            LianaDescError::BupPolicy(e)
+                        }
                         _ => LianaDescError::Policy(LianaPolicyError::IncompatibleDesc),
                     })
                     .or(Err(legacy_err))

@@ -426,7 +426,7 @@ impl Path {
             return Ok(start + self.cursor_increment());
         }
         let mut cursor = start;
-        let (fragments, indices) = super::compile::path_into_fragments(self, &mut cursor)?;
+        let (fragments, indices) = super::compile::path_into_miniscript_policy_vec(self, &mut cursor)?;
         self.indices = indices;
         self.leaves.reserve(fragments.len());
         for frag in fragments {
