@@ -12,12 +12,12 @@ use crate::{
     widget::{self, *},
 };
 
-use super::text::{p1_regular, H5_SIZE, P2_SIZE};
+use super::text::{p1_regular, H5_SIZE, P1_SIZE};
 
 const PILL_PADDING: [u16; 2] = [6, 15];
-const PILL_PADDING_COMPACT: [u16; 2] = [6, 10];
+const PILL_PADDING_COMPACT: [u16; 2] = [4, 6];
 const PILL_FONT_SIZE: u32 = H5_SIZE;
-const PILL_FONT_SIZE_COMPACT: u32 = P2_SIZE;
+const PILL_FONT_SIZE_COMPACT: u32 = P1_SIZE;
 const PILL_FONT: Font = font::MEDIUM;
 const PILL_FONT_COMPACT: Font = font::REGULAR;
 
@@ -30,6 +30,7 @@ fn tooltip_text<'a>(content: impl Display) -> iced::widget::Text<'a, Theme> {
 pub enum PillWidth {
     S = 90,
     M = 150,
+    ML = 175,
     L = 200,
     XL = 250,
     Shrink,
@@ -74,9 +75,14 @@ pub fn pill_with_icon<'a, T: 'a, L: Display, TT: Display>(
     } else {
         PILL_FONT_SIZE
     };
+    let font = if compact {
+        PILL_FONT_COMPACT
+    } else {
+        PILL_FONT
+    };
     let label = iced::widget::text!("{label}")
         .shaping(Shaping::Advanced)
-        .font(PILL_FONT)
+        .font(font)
         .center()
         .size(size);
     let content = match (icon, compact) {
@@ -84,12 +90,11 @@ pub fn pill_with_icon<'a, T: 'a, L: Display, TT: Display>(
         (Some(icon), false) => row![icon, Space::with_width(15), label, Space::fill_width()],
         (None, _) => row![label],
     };
-    // Compact pills shrink to content; full pills center within a fixed width.
     let pill = if compact {
         Container::new(content)
             .padding(PILL_PADDING_COMPACT)
-            .align_y(Alignment::Center)
             .style(style)
+            .center_x(width)
     } else {
         Container::new(content)
             .padding(PILL_PADDING)
@@ -124,7 +129,30 @@ fn pill_body_with_font<'a, T: 'a, L: Display>(
     style: fn(&Theme) -> Style,
     font: Font,
 ) -> Container<'a, T> {
-    pill_body_with_text_size_and_font(label, width, style, font, PILL_FONT_SIZE)
+    pill_body_with_text_size_and_font_and_padding(
+        label,
+        width,
+        style,
+        font,
+        PILL_FONT_SIZE,
+        PILL_PADDING,
+    )
+}
+
+fn compact_pill_body_with_font<'a, T: 'a, L: Display>(
+    label: L,
+    width: PillWidth,
+    style: fn(&Theme) -> Style,
+    font: Font,
+) -> Container<'a, T> {
+    pill_body_with_text_size_and_font_and_padding(
+        label,
+        width,
+        style,
+        font,
+        PILL_FONT_SIZE_COMPACT,
+        PILL_PADDING_COMPACT,
+    )
 }
 
 fn pill_body_with_text_size_and_font<'a, T: 'a, L: Display>(
@@ -134,21 +162,50 @@ fn pill_body_with_text_size_and_font<'a, T: 'a, L: Display>(
     font: Font,
     size: u32,
 ) -> Container<'a, T> {
+    pill_body_with_text_size_and_font_and_padding(label, width, style, font, size, PILL_PADDING)
+}
+
+fn compact_pill_body_with_text_size_and_font<'a, T: 'a, L: Display>(
+    label: L,
+    width: PillWidth,
+    style: fn(&Theme) -> Style,
+    font: Font,
+    size: u32,
+) -> Container<'a, T> {
+    pill_body_with_text_size_and_font_and_padding(
+        label,
+        width,
+        style,
+        font,
+        size,
+        PILL_PADDING_COMPACT,
+    )
+}
+
+fn pill_body_with_text_size_and_font_and_padding<'a, T: 'a, L: Display>(
+    label: L,
+    width: PillWidth,
+    style: fn(&Theme) -> Style,
+    font: Font,
+    size: u32,
+    padding: [u16; 2],
+) -> Container<'a, T> {
     let item = iced::widget::text!("{label}")
         .shaping(Shaping::Advanced)
         .font(font)
         .center()
         .size(size);
-    pill_body_with_item(item, width, style)
+    pill_body_with_item_and_padding(item, width, style, padding)
 }
 
-fn pill_body_with_item<'a, T: 'a, I: Into<Element<'a, T>>>(
+fn pill_body_with_item_and_padding<'a, T: 'a, I: Into<Element<'a, T>>>(
     item: I,
     width: PillWidth,
     style: fn(&Theme) -> Style,
+    padding: [u16; 2],
 ) -> Container<'a, T> {
     Container::new(item)
-        .padding(PILL_PADDING)
+        .padding(padding)
         .width(width)
         .align_x(Alignment::Center)
         .align_y(Alignment::Center)
@@ -184,10 +241,20 @@ pills! {
     draft,          "Draft",        "",                                                               M, simple;
     set_keys,       "Set keys",     "",                                                               M, warning;
     active,         "Active",       "",                                                               M, success;
-    ws_admin,       "WS Admin",     "",                                                               M, simple;
     register,       "Register",     "",                                                               M, warning;
-    xpub_set,       "✓ Set",        "",                                                               M, success;
-    xpub_not_set,   "Not Set",      "",                                                               M, warning;
+}
+
+pub fn compact_metric<'a, T: 'a, L: Display>(
+    text: L,
+    style: fn(&Theme) -> Style,
+) -> Container<'a, T> {
+    compact_pill_body_with_text_size_and_font(
+        text,
+        PillWidth::Shrink,
+        style,
+        PILL_FONT_COMPACT,
+        PILL_FONT_SIZE_COMPACT,
+    )
 }
 
 pub fn compact_pill<'a, T: 'a>(
@@ -195,19 +262,43 @@ pub fn compact_pill<'a, T: 'a>(
     width: PillWidth,
     style: fn(&Theme) -> Style,
 ) -> Container<'a, T> {
-    pill_body_with_text_size_and_font(text, width, style, PILL_FONT, PILL_FONT_SIZE_COMPACT)
-        .padding(PILL_PADDING_COMPACT)
+    compact_pill_body_with_text_size_and_font(
+        text,
+        width,
+        style,
+        PILL_FONT_COMPACT,
+        PILL_FONT_SIZE_COMPACT,
+    )
+}
+
+pub fn role_manager<'a, T: 'a>() -> Container<'a, T> {
+    compact_metric("Manager", theme::pill::role_manager)
+}
+
+pub fn role_participant<'a, T: 'a>() -> Container<'a, T> {
+    compact_metric("Participant", theme::pill::role_participant)
+}
+
+pub fn ws_admin<'a, T: 'a>() -> Container<'a, T> {
+    compact_metric("WS Admin", theme::pill::simple)
+}
+
+pub fn xpub_set<'a, T: 'a>() -> Container<'a, T> {
+    compact_pill("✓ Set", PillWidth::S, theme::pill::success)
+}
+
+pub fn xpub_not_set<'a, T: 'a>() -> Container<'a, T> {
+    compact_pill("Not Set", PillWidth::S, theme::pill::warning)
 }
 
 pub fn unconfirmed_compact<'a, T: 'a>() -> Container<'a, T> {
-    pill_body_with_text_size_and_font(
+    compact_pill_body_with_text_size_and_font(
         "Unconfirmed",
         PillWidth::M,
         theme::pill::simple_fill,
         PILL_FONT,
         PILL_FONT_SIZE_COMPACT,
     )
-    .padding(PILL_PADDING_COMPACT)
 }
 
 pub fn rescan<'a, T: 'a>(progress: f64, compact: bool) -> Container<'a, T> {
@@ -216,16 +307,27 @@ pub fn rescan<'a, T: 'a>(progress: f64, compact: bool) -> Container<'a, T> {
     } else {
         PILL_FONT_SIZE
     };
+    let font = if compact {
+        PILL_FONT_COMPACT
+    } else {
+        PILL_FONT
+    };
     let width = if compact { PillWidth::M } else { PillWidth::L };
     let mut pill = pill_body_with_text_size_and_font(
         format!("Rescan… {:.2}%", progress * 100.0),
         width,
         theme::pill::simple,
-        PILL_FONT,
+        font,
         size,
     );
     if compact {
-        pill = pill.padding(PILL_PADDING_COMPACT);
+        pill = compact_pill_body_with_text_size_and_font(
+            format!("Rescan… {:.2}%", progress * 100.0),
+            width,
+            theme::pill::simple,
+            font,
+            size,
+        );
     }
     pill
 }
@@ -235,13 +337,12 @@ pub fn fingerprint<'a, T: 'a>(fg: impl Into<String>, alias: Option<&str>) -> Con
     let height = 32;
     match alias {
         Some(alias) => {
-            let body = pill_body_with_font(
+            let body = compact_pill_body_with_font(
                 alias.to_string(),
                 PillWidth::Shrink,
                 theme::pill::fingerprint,
                 PILL_FONT_COMPACT,
             )
-            .padding(PILL_PADDING_COMPACT)
             .center_y(height);
             Container::new(tooltip::Tooltip::new(
                 body,
@@ -252,13 +353,12 @@ pub fn fingerprint<'a, T: 'a>(fg: impl Into<String>, alias: Option<&str>) -> Con
             ))
             .center_y(height)
         }
-        None => pill_body_with_font(
+        None => compact_pill_body_with_font(
             fg,
             PillWidth::M,
             theme::pill::fingerprint,
             PILL_FONT_COMPACT,
         )
-        .padding(PILL_PADDING_COMPACT)
         .center_y(height),
     }
     .center_y(height)

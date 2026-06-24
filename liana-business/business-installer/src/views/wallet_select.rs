@@ -12,7 +12,7 @@ use liana_ui::{
         pill,
         text::{self, truncate},
     },
-    theme,
+    icon, theme,
     widget::*,
 };
 
@@ -58,21 +58,30 @@ fn derive_user_role(
 /// Render a colored status badge for wallet status
 fn status_badge(wallet: &Wallet, user_email: &str) -> Element<'static, Msg> {
     match wallet.effective_status(user_email) {
-        WalletStatus::Registration => pill::register(),
-        WalletStatus::Created | WalletStatus::Drafted => pill::draft(),
-        WalletStatus::Locked => pill::to_approve(),
-        WalletStatus::Validated => pill::set_keys(),
-        WalletStatus::Finalized => pill::active(),
+        WalletStatus::Registration => {
+            pill::compact_pill("Register", pill::PillWidth::M, theme::pill::warning)
+        }
+        WalletStatus::Created | WalletStatus::Drafted => {
+            pill::compact_pill("Draft", pill::PillWidth::M, theme::pill::simple)
+        }
+        WalletStatus::Locked => {
+            pill::compact_pill("To approve", pill::PillWidth::M, theme::pill::warning)
+        }
+        WalletStatus::Validated => {
+            pill::compact_pill("Set keys", pill::PillWidth::M, theme::pill::warning)
+        }
+        WalletStatus::Finalized => {
+            pill::compact_pill("Active", pill::PillWidth::M, theme::pill::success)
+        }
     }
     .into()
 }
 
-/// Get a display label for the user role
-fn role_label(role: &UserRole) -> &'static str {
+fn role_badge(role: &UserRole) -> Option<Element<'static, Msg>> {
     match role {
-        UserRole::WizardSardineAdmin => "Admin",
-        UserRole::WalletManager => "Manager",
-        UserRole::Participant => "Participant",
+        UserRole::WizardSardineAdmin => None,
+        UserRole::WalletManager => Some(pill::role_manager().into()),
+        UserRole::Participant => Some(pill::role_participant().into()),
     }
 }
 
@@ -94,47 +103,43 @@ pub fn wallet_card<'a>(
     last_edit_info: Option<String>,
     user_email: &str,
 ) -> Container<'a, Msg> {
-    let key_count = wallet.template.as_ref().map(|t| t.keys.len()).unwrap_or(0);
-    let keys = match key_count {
-        0 => "".to_string(),
-        1 => "(1 key)".to_string(),
-        c => format!("({c} keys)"),
-    };
-
+    let key_count = wallet.template.as_ref().map(|template| template.keys.len());
     let alias = truncate(&wallet.alias, 25);
-    // Left side: wallet name, key count, and edit info
-    let mut left_col = Column::new()
-        .push(
-            row![
-                text::h3(alias),
-                text::p1_medium(keys).style(theme::text::primary)
-            ]
-            .spacing(5)
-            .align_y(Alignment::Center),
-        )
-        .spacing(5);
+    let key_count: Option<Element<'static, Msg>> = key_count.and_then(|count| match count {
+        0 => None,
+        1 => Some(
+            text::caption("(1 key)")
+                .style(liana_ui::theme::text::secondary)
+                .into(),
+        ),
+        count => Some(
+            text::caption(format!("({count} keys)"))
+                .style(liana_ui::theme::text::secondary)
+                .into(),
+        ),
+    });
+    let alias_row = row![text::h3(alias)]
+        .push_maybe(key_count)
+        .push_maybe(role_badge(role))
+        .spacing(10)
+        .align_y(Alignment::Center);
+
+    let mut left_col = Column::new().push(alias_row).spacing(5);
 
     if let Some(info) = last_edit_info {
         left_col = left_col.push(text::caption(info).style(liana_ui::theme::text::secondary));
     }
 
-    // Right side: status badge and role label
-    // Don't show "Manager" role - it's already in the header for WS Admin users
-    let mut right_col = Column::new()
-        .push(status_badge(wallet, user_email))
-        .spacing(4)
-        .width(pill::PillWidth::M)
-        .align_x(Alignment::Center);
+    let trailing = row![
+        status_badge(wallet, user_email),
+        icon::chevron_right()
+            .size(18)
+            .color(liana_ui::color::LIGHT_BORDER)
+    ]
+    .spacing(12)
+    .align_y(Alignment::Center);
 
-    // Only show role for Wallet Manager and Participant (not WS Admin)
-    if !matches!(role, UserRole::WizardSardineAdmin) {
-        right_col = right_col.push(text::p2_medium(role_label(role)).style(theme::text::primary));
-    }
-
-    let content = Row::new()
-        .push(left_col)
-        .push(Space::with_width(Length::Fill))
-        .push(right_col)
+    let content = row![left_col, Space::with_width(Length::Fill), trailing]
         .align_y(Alignment::Center)
         .height(Length::Fill);
 
