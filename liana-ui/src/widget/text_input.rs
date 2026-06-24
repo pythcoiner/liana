@@ -48,6 +48,7 @@ where
     alignment: alignment::Horizontal,
     on_input: Option<Box<dyn Fn(String) -> Message + 'a>>,
     on_paste: Option<Box<dyn Fn(String) -> Message + 'a>>,
+    on_blur: Option<Message>,
     on_submit: Option<Message>,
     icon: Option<Icon<Renderer::Font>>,
     class: <Theme as Catalog>::Class<'a>,
@@ -80,6 +81,7 @@ where
             alignment: alignment::Horizontal::Left,
             on_input: None,
             on_paste: None,
+            on_blur: None,
             on_submit: None,
             icon: None,
             class: <Theme as Catalog>::default(),
@@ -142,6 +144,12 @@ where
     /// the [`TextInput`], if `Some`.
     pub fn on_paste_maybe(mut self, on_paste: Option<impl Fn(String) -> Message + 'a>) -> Self {
         self.on_paste = on_paste.map(|f| Box::new(f) as _);
+        self
+    }
+
+    /// Sets the message that should be produced when the [`TextInput`] loses focus.
+    pub fn on_blur(mut self, message: Message) -> Self {
+        self.on_blur = Some(message);
         self
     }
 
@@ -547,6 +555,11 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        let started_focused = tree
+            .state
+            .downcast_ref::<State<Renderer::Paragraph>>()
+            .is_focused();
+
         let update_cache = |state, value| {
             replace_paragraph(
                 renderer,
@@ -1015,6 +1028,17 @@ where
                 }
             }
             _ => {}
+        }
+
+        let is_focused = tree
+            .state
+            .downcast_ref::<State<Renderer::Paragraph>>()
+            .is_focused();
+
+        if started_focused && !is_focused {
+            if let Some(on_blur) = self.on_blur.clone() {
+                shell.publish(on_blur);
+            }
         }
     }
 

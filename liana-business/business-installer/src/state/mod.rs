@@ -15,9 +15,11 @@ use liana_ui::widget::{modal::Modal, Element};
 pub use message::{Message, Msg};
 use miniscript::bitcoin::Network;
 use std::{
+    collections::BTreeSet,
     sync::{Arc, Mutex},
     task::Waker,
 };
+use uuid::Uuid;
 
 /// Shared waker for the notification stream.
 /// When a message is sent to notif_sender, the sender should wake this
@@ -66,6 +68,7 @@ pub struct State {
     bitbox_config: Arc<dyn NoiseConfig>,
     /// Error from RunLianaBusiness connection failure
     pub connection_error: Option<String>,
+    pending_user_fetches: BTreeSet<Uuid>,
 }
 
 impl State {
@@ -118,6 +121,7 @@ impl State {
             _hw_bridge_handle: Some(hw_bridge_handle),
             bitbox_config,
             connection_error: None,
+            pending_user_fetches: BTreeSet::new(),
         }
     }
 

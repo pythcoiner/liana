@@ -89,7 +89,6 @@ pub trait Backend {
         wallet_id: Uuid,
         infos: RegistrationInfos);
 
-    #[cfg(test)]
     fn fetch_user(&mut self, id: Uuid);
 }
 

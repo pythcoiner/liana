@@ -236,6 +236,12 @@ where
         self
     }
 
+    /// Sets the message that should be produced when the [`Form`] input loses focus.
+    pub fn on_blur(mut self, message: Message) -> Self {
+        self.input = self.input.on_blur(message);
+        self
+    }
+
     /// Sets the [`Id`] of the [`Form`] input.
     pub fn id(mut self, id: impl Into<text_input::Id>) -> Self {
         self.input = self.input.id(id);
