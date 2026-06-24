@@ -168,7 +168,6 @@ pub fn template_builder_view(state: &State) -> Element<'_, Msg> {
         list_content,
         pinned_content,
         footer_content,
-        true,
         Some(Msg::NavigateBack),
     )
 }
