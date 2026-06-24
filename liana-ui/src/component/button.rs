@@ -3,7 +3,7 @@ use std::fmt::Display;
 use super::{
     modal::BTN_W,
     text::{
-        new::{button_text, button_text_compact, BUTTON_TEXT_COMPACT_SPEC},
+        new::{button_text, button_text_compact, caption, BUTTON_TEXT_COMPACT_SPEC},
         p1_regular, panel_title, text,
     },
     tooltip,
@@ -627,8 +627,8 @@ pub fn btn_reload<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
     btn_primary(None, "Reload", BtnWidth::M, msg)
 }
 
-pub fn btn_approve_template<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
-    btn_primary(None, "Approve template", BtnWidth::XL, msg)
+pub fn btn_approve<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
+    btn_primary(None, "Approve", BtnWidth::XL, msg)
 }
 
 pub fn btn_send_for_approval<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
@@ -641,6 +641,29 @@ pub fn btn_keep_changes<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
 
 pub fn btn_send_token<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
     btn_primary(None, "Send token", BtnWidth::L, msg)
+}
+
+/// A subtle text link (gray, darkens on hover). iced text cannot underline, so the underline is
+/// a 1px rule stacked under the label.
+pub fn subtle_link<'a, T: Clone + 'a>(label: impl Display, msg: Option<T>) -> Element<'a, T> {
+    let link = Button::new(caption(label).size(14))
+        .padding(0)
+        .style(theme::button::link_subtle)
+        .on_press_maybe(msg);
+    let underline =
+        Container::new(iced::widget::rule::horizontal(1).style(theme::rule::link_underline))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_y(Vertical::Bottom);
+    Stack::new()
+        .width(Length::Shrink)
+        .push(link)
+        .push(underline)
+        .into()
+}
+
+pub fn btn_template_help<'a, T: Clone + 'a>(msg: Option<T>) -> Element<'a, T> {
+    subtle_link("Something’s wrong with this template?", msg)
 }
 
 pub fn btn_breadcrumb_previous<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {

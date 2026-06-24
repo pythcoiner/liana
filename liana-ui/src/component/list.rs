@@ -6,11 +6,13 @@ use crate::{
     component::{
         badge::{self, TileName},
         button::{self, EntryWidth, ListEntryAccent},
-        text,
+        text::{self, new::caption},
     },
     icon, theme,
-    widget::{Button, Column, ColumnExt, Container, Element, RowExt},
+    widget::{Button, Column, ColumnExt, Container, Element, Row, RowExt},
 };
+
+const PATH_DELETE_SLOT_WIDTH: f32 = 24.0;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EntryStatus {
@@ -177,14 +179,14 @@ pub fn entry_key<'a, M: Clone + 'a>(
 pub fn entry_path<'a, M: Clone + 'a>(
     role: EntryPathRole,
     title: impl Display,
-    subtitle: Option<impl Display>,
+    summary: impl Display,
+    availability: Element<'a, M>,
+    key_pills: Vec<Element<'a, M>>,
     trailing: Option<Element<'a, M>>,
     msg: Option<M>,
 ) -> Element<'a, M> {
-    list_entry_row(
-        None,
-        container_body(title, subtitle),
-        trailing,
+    button::list_entry(
+        path_body(title, summary, availability, key_pills, trailing),
         Some(path_accent(role)),
         EntryWidth::Standard,
         msg,
@@ -373,6 +375,42 @@ fn key_body<'a, M: 'a>(
     let content = Column::new().push(title).push(signer).width(Length::Fill);
 
     Container::new(content).width(Length::Fill).into()
+}
+
+fn path_body<'a, M: 'a>(
+    title: impl Display,
+    summary: impl Display,
+    availability: Element<'a, M>,
+    key_pills: Vec<Element<'a, M>>,
+    trailing: Option<Element<'a, M>>,
+) -> Element<'a, M> {
+    let title_block = Column::new().push(text::new::h3_semi(title)).push(
+        Container::new(caption(summary).style(theme::text::tertiary)).padding(iced::Padding {
+            top: 2.0,
+            ..iced::Padding::ZERO
+        }),
+    );
+    let trailing = Container::new(trailing.unwrap_or_else(|| Row::new().into()))
+        .width(Length::Fixed(PATH_DELETE_SLOT_WIDTH))
+        .align_x(Horizontal::Center)
+        .align_y(Alignment::Center);
+    let header = row![
+        Container::new(title_block).width(Length::Fill),
+        availability,
+        trailing
+    ]
+    .spacing(16)
+    .align_y(Alignment::Start)
+    .width(Length::Fill);
+    let pills = Row::with_children(key_pills).spacing(9).wrap();
+    Column::new()
+        .push(header)
+        .push(Container::new(pills).padding(iced::Padding {
+            top: 10.0,
+            ..iced::Padding::ZERO
+        }))
+        .width(Length::Fill)
+        .into()
 }
 
 fn body<'a, M: 'a>(

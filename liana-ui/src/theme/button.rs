@@ -44,6 +44,7 @@ button_styles!(
     transparent_border,
     clickable_section,
     link,
+    link_subtle,
     signing_devices,
 );
 

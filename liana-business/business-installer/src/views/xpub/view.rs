@@ -205,7 +205,7 @@ pub fn xpub_view(state: &State) -> Element<'_, Msg> {
         Some(current_user_email),
         is_ws_admin,
         &breadcrumb,
-        header_content,
+        Some(header_content.into()),
         list_content,
         None,
         None,

@@ -254,7 +254,7 @@ pub fn keys_view(state: &State) -> Element<'_, Msg> {
         Some(current_user_email),
         is_ws_admin,
         &breadcrumb,
-        header_content,
+        Some(header_content),
         keys_list,
         pinned_content,
         footer_content,

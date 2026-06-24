@@ -42,3 +42,13 @@ pub fn separator(theme: &Theme) -> Style {
         snap: true,
     }
 }
+
+/// Underline drawn under a subtle link, matching its text colour.
+pub fn link_underline(theme: &Theme) -> Style {
+    Style {
+        color: theme.colors.buttons.link_subtle.active.text,
+        radius: 0.0.into(),
+        fill_mode: FillMode::Full,
+        snap: true,
+    }
+}

@@ -100,7 +100,7 @@ fn breadcrumb_header<'a>(segments: &[String]) -> Element<'a, Msg> {
 enum LayoutContent<'a> {
     Scrollable(Element<'a, Msg>),
     ScrollableList {
-        header: Element<'a, Msg>,
+        header: Option<Element<'a, Msg>>,
         list: Element<'a, Msg>,
         pinned: Option<Element<'a, Msg>>,
         footer: Option<Element<'a, Msg>>,
@@ -223,18 +223,20 @@ fn layout_inner<'a>(
             pinned,
             footer,
         } => {
-            let header_area = Row::new()
-                .push(Space::with_width(Length::FillPortion(2)))
-                .push(
-                    Container::new(header_content)
-                        .width(Length::FillPortion(fill_portion))
-                        .padding(Padding {
-                            top: 22.0,
-                            bottom: 14.0,
-                            ..Padding::ZERO
-                        }),
-                )
-                .push_maybe(right_spacer());
+            let header_area = header_content.map(|header_content| {
+                Row::new()
+                    .push(Space::with_width(Length::FillPortion(2)))
+                    .push(
+                        Container::new(header_content)
+                            .width(Length::FillPortion(fill_portion))
+                            .padding(Padding {
+                                top: 22.0,
+                                bottom: 14.0,
+                                ..Padding::ZERO
+                            }),
+                    )
+                    .push_maybe(right_spacer())
+            });
 
             let list_area = Row::new()
                 .push(Space::with_width(Length::FillPortion(2)))
@@ -265,7 +267,7 @@ fn layout_inner<'a>(
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .push(layout_header)
-                    .push(header_area)
+                    .push_maybe(header_area)
                     .push(list_area)
                     .push_maybe(pinned_area)
                     .push_maybe(footer_area),
@@ -307,7 +309,7 @@ pub fn layout_with_scrollable_list<'a>(
     email: Option<&'a str>,
     is_ws_admin: bool,
     breadcrumb: &[String],
-    header_content: impl Into<Element<'a, Msg>>,
+    header_content: Option<Element<'a, Msg>>,
     list_content: impl Into<Element<'a, Msg>>,
     pinned_content: Option<Element<'a, Msg>>,
     footer_content: Option<Element<'a, Msg>>,
@@ -320,7 +322,7 @@ pub fn layout_with_scrollable_list<'a>(
         is_ws_admin,
         breadcrumb,
         LayoutContent::ScrollableList {
-            header: header_content.into(),
+            header: header_content,
             list: list_content.into(),
             pinned: pinned_content,
             footer: footer_content,
@@ -453,7 +455,7 @@ pub fn select_list_view(cfg: SelectListView<'_>) -> Element<'_, Msg> {
         Some(cfg.email),
         cfg.is_ws_admin,
         &cfg.breadcrumb,
-        header,
+        Some(header.into()),
         list,
         None,
         None,
