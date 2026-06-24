@@ -54,7 +54,11 @@ pub fn edit_path_modal_view<'a>(
             state,
             &current_user_email_lower,
         )
-        .map(|info| text::caption(info).style(theme::text::secondary).into())
+        .map(|info| {
+            text::new::caption(info)
+                .style(theme::text::secondary)
+                .into()
+        })
     } else if let Some(idx) = modal_state.path_index {
         state
             .app
@@ -68,18 +72,22 @@ pub fn edit_path_modal_view<'a>(
                     &current_user_email_lower,
                 )
             })
-            .map(|info| text::caption(info).style(theme::text::secondary).into())
+            .map(|info| {
+                text::new::caption(info)
+                    .style(theme::text::secondary)
+                    .into()
+            })
     } else {
         None
     };
 
     // Key selection section
-    let keys_label = text::p1_medium("Keys in Path:").style(theme::text::primary);
+    let keys_label = text::new::b5_bold("Keys in Path:").style(theme::text::primary);
 
     let keys_column = if state.app.keys.is_empty() {
-        Column::new()
-            .spacing(8)
-            .push(text::p2_medium("No keys available. Add keys first.").style(theme::text::primary))
+        Column::new().spacing(8).push(
+            text::new::caption("No keys available. Add keys first.").style(theme::text::secondary),
+        )
     } else {
         let mut col = Column::new().spacing(8);
         for (key_id, key) in state.app.keys.iter() {
@@ -136,7 +144,7 @@ pub fn edit_path_modal_view<'a>(
     // Threshold row (only shown when 2+ keys are selected)
     let threshold_row: Option<Element<'_, Msg>> = threshold_enabled.then_some({
         let threshold_label_text = format!("Threshold (1-{selected_count}):");
-        let threshold_label: Element<'_, Msg> = text::p1_medium(threshold_label_text)
+        let threshold_label: Element<'_, Msg> = text::new::b5_bold(threshold_label_text)
             .style(theme::text::primary)
             .into();
         let threshold_value = form::Value {
@@ -163,7 +171,7 @@ pub fn edit_path_modal_view<'a>(
     let threshold_warning_row = threshold_warning.map(|warning| {
         Row::new()
             .push(Space::with_width(Length::Fixed(LABEL_WIDTH + 10.0)))
-            .push(text::p2_medium(warning).style(theme::text::warning))
+            .push(text::new::caption(warning).style(theme::text::warning))
     });
 
     // Timelock validation and row (only for non-primary paths)
@@ -219,7 +227,7 @@ pub fn edit_path_modal_view<'a>(
             .spacing(10)
             .align_y(Alignment::Center)
             .push(
-                Container::new(text::p1_medium("Timelock:").style(theme::text::primary))
+                Container::new(text::new::b5_bold("Timelock:").style(theme::text::primary))
                     .width(Length::Fixed(LABEL_WIDTH)),
             )
             .push(
@@ -242,10 +250,10 @@ pub fn edit_path_modal_view<'a>(
         let timelock_warning_row = warning.map(|w| {
             Row::new()
                 .push(Space::with_width(Length::Fixed(LABEL_WIDTH + 10.0)))
-                .push(text::p2_medium(w).style(theme::text::warning))
+                .push(text::new::caption(w).style(theme::text::warning))
         });
 
-        let max_hint = text::caption(format!(
+        let max_hint = text::new::caption(format!(
             "Max: {} {}",
             modal_state.timelock_unit.max_value(),
             modal_state.timelock_unit

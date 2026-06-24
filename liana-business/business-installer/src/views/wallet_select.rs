@@ -105,12 +105,12 @@ pub fn wallet_card<'a>(
     let key_count: Option<Element<'static, Msg>> = key_count.and_then(|count| match count {
         0 => None,
         1 => Some(
-            text::caption("(1 key)")
+            text::new::caption("(1 key)")
                 .style(liana_ui::theme::text::secondary)
                 .into(),
         ),
         count => Some(
-            text::caption(format!("({count} keys)"))
+            text::new::caption(format!("({count} keys)"))
                 .style(liana_ui::theme::text::secondary)
                 .into(),
         ),
@@ -161,12 +161,6 @@ pub fn wallet_select_view(state: &State) -> Element<'_, Msg> {
     };
 
     // Set title based on whether wallets exist
-    let title_text = if has_wallets {
-        "Select wallet"
-    } else {
-        "Create a wallet"
-    };
-
     // Get current user email for role derivation
     let current_user_email = &state.views.login.email.form.value;
     let hide_finalized = state.views.wallet_select.hide_finalized;
@@ -246,8 +240,8 @@ pub fn wallet_select_view(state: &State) -> Element<'_, Msg> {
                 // Show message when search filter returns no results
                 if wallets_to_display.is_empty() && !search_filter.is_empty() {
                     list_content = list_content.push(
-                        text::p1_medium("No wallets found matching your search.")
-                            .style(theme::text::primary),
+                        text::new::caption("No wallets found matching your search.")
+                            .style(theme::text::secondary),
                     );
                 } else {
                     let current_user_email_lower = current_user_email.to_lowercase();
@@ -284,7 +278,7 @@ pub fn wallet_select_view(state: &State) -> Element<'_, Msg> {
         email: current_user_email,
         is_ws_admin,
         breadcrumb,
-        title: title_text.to_string(),
+        title: "Wallets".to_string(),
         search: has_wallets.then_some(SelectSearch {
             placeholder: "Filter wallets...",
             value: &state.views.wallet_select.search_filter,

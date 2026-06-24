@@ -1,7 +1,10 @@
 use crate::{
     backend::Backend,
     state::{Msg, State},
-    views::{entry_key_kind, format_last_edit_info, layout_with_scrollable_list, MENU_ENTRY_WIDTH},
+    views::{
+        entry_key_kind, format_last_edit_info, layout_with_scrollable_list, screen_intro,
+        MENU_ENTRY_WIDTH,
+    },
 };
 use iced::{
     widget::{row, Space},
@@ -102,20 +105,20 @@ pub fn xpub_view(state: &State) -> Element<'_, Msg> {
                 .push(
                     Column::new()
                         .spacing(5)
-                        .push(text::p1_bold(keys_set_msg))
-                        .push(text::p1_medium(
+                        .push(text::new::caption(keys_set_msg))
+                        .push(text::new::caption(
                             "Once the other participants complete their key setup, you'll be able to access the wallet.",
-                        ).style(theme::text::primary)),
+                        ).style(theme::text::secondary)),
                 ),
         )
         .align_x(Alignment::Center)
         .width(Length::Fill)
         .into()
     } else {
-        text::p1_medium(
+        text::new::caption(
             "Select a key to complete its setup. Keys can be set up by each key manager individually, or by the wallet manager on their behalf. You can connect a hardware device (recommended) or manually add an extended public key (xpub).",
         )
-        .style(theme::text::primary)
+        .style(theme::text::secondary)
         .into()
     };
 
@@ -123,8 +126,7 @@ pub fn xpub_view(state: &State) -> Element<'_, Msg> {
         .spacing(10)
         .align_x(Alignment::Center)
         .padding(20)
-        .push(text::h2(format!("{wallet_name} - Set Keys")))
-        .push(Space::with_height(10))
+        .push(screen_intro(format!("{wallet_name} - Set Keys"), None))
         .push(instruction);
 
     // Build scrollable key list
@@ -141,12 +143,12 @@ pub fn xpub_view(state: &State) -> Element<'_, Msg> {
             _ => "No keys found",
         };
         list_content =
-            list_content.push(text::p1_medium(empty_message).style(theme::text::primary));
+            list_content.push(text::new::caption(empty_message).style(theme::text::secondary));
     } else {
         list_content = list_content.push(
             row![
                 Space::with_width(10),
-                text::h3("Your keys:").style(theme::text::primary),
+                text::new::h3_semi("Your keys").style(theme::text::primary),
                 Space::with_width(Length::Fill)
             ]
             .width(MENU_ENTRY_WIDTH),
@@ -173,7 +175,7 @@ pub fn xpub_view(state: &State) -> Element<'_, Msg> {
         list_content = list_content.push(Space::with_height(20)).push(
             row![
                 Space::with_width(10),
-                text::h3("Other participants' keys:").style(theme::text::primary),
+                text::new::h3_semi("Other participants' keys").style(theme::text::primary),
                 Space::with_width(Length::Fill)
             ]
             .width(MENU_ENTRY_WIDTH),

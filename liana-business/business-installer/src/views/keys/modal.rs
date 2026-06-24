@@ -48,7 +48,11 @@ pub fn edit_key_modal_view<'a>(
                     &current_user_email_lower,
                 )
             })
-            .map(|info| text::caption(info).style(theme::text::secondary).into())
+            .map(|info| {
+                text::new::caption(info)
+                    .style(theme::text::secondary)
+                    .into()
+            })
     } else {
         None
     };
@@ -62,7 +66,7 @@ pub fn edit_key_modal_view<'a>(
     };
     let alias_input = Column::new()
         .spacing(5)
-        .push(text::p1_medium("Key Alias").style(theme::text::primary))
+        .push(text::new::b5_bold("Key Alias").style(theme::text::primary))
         .push(form::Form::new(
             "Enter key alias",
             &alias_value,
@@ -79,7 +83,7 @@ pub fn edit_key_modal_view<'a>(
     let key_type_label = Row::new()
         .spacing(5)
         .align_y(Alignment::Center)
-        .push(text::p1_medium("Key Type").style(theme::text::primary))
+        .push(text::new::b5_bold("Key Type").style(theme::text::primary))
         .push(tooltip::tooltip(
             "Internal: key held by your organization.\n \
                 External: key held by third parties.\n \
@@ -119,7 +123,8 @@ pub fn edit_key_modal_view<'a>(
             Column::new()
                 .spacing(5)
                 .push(
-                    text::p1_medium("Email Address of the Key Manager").style(theme::text::primary),
+                    text::new::b5_bold("Email Address of the Key Manager")
+                        .style(theme::text::primary),
                 )
                 .push(form::Form::new(
                     "Enter email address",
@@ -147,7 +152,7 @@ pub fn edit_key_modal_view<'a>(
         Some(
             Column::new()
                 .spacing(5)
-                .push(text::p1_medium("Token").style(theme::text::primary))
+                .push(text::new::b5_bold("Token").style(theme::text::primary))
                 .push(form::Form::new(
                     "Enter token (e.g., 42-absent-cake-eagle)",
                     &token_value,
