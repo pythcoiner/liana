@@ -16,13 +16,11 @@ use crate::{
 };
 use iced::{
     alignment::{Horizontal, Vertical},
-    mouse,
     widget::{
         button::{Status, Style},
-        canvas::{self, Canvas, LineDash, Path, Stroke},
         container, row, Space,
     },
-    Background, Border, Color, Length, Padding, Point, Rectangle, Size,
+    Background, Border, Color, Length, Padding,
 };
 
 const MENU_BTN_PADDING: [u16; 2] = [4 /* Top/Bottom */, 12 /* Left/Right */];
@@ -30,9 +28,6 @@ const MENU_TEXT_SIZE: u32 = 22;
 const MENU_TEXT_COMPACT_SIZE: u32 = 18;
 const MENU_ICON_SIZE: u32 = ICON_SIZE_L as u32;
 const AUXILIARY_PADDING: [u16; 2] = [14, 20];
-const AUXILIARY_RADIUS: f32 = 16.0;
-const AUXILIARY_BORDER_WIDTH: f32 = 1.0;
-const AUXILIARY_DASH: &[f32] = &[6.0, 6.0];
 const LIST_ENTRY_ACCENT_WIDTH: f32 = 4.0;
 /// Padding inside every list entry; with the tile it enforces the row height.
 const LIST_ENTRY_PADDING: [u16; 2] = [14, 20];
@@ -167,10 +162,10 @@ pub fn auxiliary<'a, T: 'a + Clone>(
     t: impl Display,
     msg: Option<T>,
 ) -> Button<'a, T> {
-    Button::new(auxiliary_content(icon, t, msg.is_some()))
+    Button::new(auxiliary_content(icon, t))
         .style(theme::button::auxiliary)
         .on_press_maybe(msg)
-        .width(Length::Fill)
+        .width(STANDARD_ENTRY_WIDTH)
 }
 
 pub fn breadcrumb<'a, T: 'a>(icon: Option<Text<'a>>, t: &'static str) -> Button<'a, T> {
@@ -276,13 +271,9 @@ fn content<'a, T: 'a>(icon: Option<Text<'a>>, text: Text<'a>, compact: bool) -> 
     content_with_tooltip(icon, text, None, compact)
 }
 
-fn auxiliary_content<'a, T: 'a>(
-    icon: Option<Text<'a>>,
-    t: impl Display,
-    enabled: bool,
-) -> Stack<'a, T> {
+fn auxiliary_content<'a, T: 'a>(icon: Option<Text<'a>>, t: impl Display) -> Container<'a, T> {
     let text = Text::new(t.to_string()).size(16).font(MANROPE_SEMIBOLD);
-    let content = match icon {
+    match icon {
         None => container(text),
         Some(icon) => container(
             row![icon.size(16), text]
@@ -292,93 +283,7 @@ fn auxiliary_content<'a, T: 'a>(
     }
     .align_x(Horizontal::Center)
     .padding(AUXILIARY_PADDING)
-    .width(Length::Fill);
-    Stack::new().push(content).push(
-        Canvas::<AuxiliaryBorder, T, Theme, Renderer>::new(AuxiliaryBorder { enabled })
-            .width(Length::Fill)
-            .height(Length::Fill),
-    )
-}
-
-#[derive(Debug, Clone, Copy)]
-struct AuxiliaryBorder {
-    enabled: bool,
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-struct AuxiliaryBorderState {
-    pressed: bool,
-}
-
-impl<Message> canvas::Program<Message, Theme, Renderer> for AuxiliaryBorder {
-    type State = AuxiliaryBorderState;
-
-    fn update(
-        &self,
-        state: &mut Self::State,
-        event: &canvas::Event,
-        bounds: Rectangle,
-        cursor: mouse::Cursor,
-    ) -> Option<canvas::Action<Message>> {
-        if !self.enabled {
-            state.pressed = false;
-            return None;
-        }
-
-        match event {
-            canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-                if cursor.is_over(bounds) =>
-            {
-                state.pressed = true;
-                Some(canvas::Action::request_redraw())
-            }
-            canvas::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                state.pressed = false;
-                Some(canvas::Action::request_redraw())
-            }
-            _ => None,
-        }
-    }
-
-    fn draw(
-        &self,
-        state: &Self::State,
-        renderer: &Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
-        cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let inset = AUXILIARY_BORDER_WIDTH / 2.0;
-        let path = Path::rounded_rectangle(
-            Point::new(inset, inset),
-            Size::new(
-                bounds.width - AUXILIARY_BORDER_WIDTH,
-                bounds.height - AUXILIARY_BORDER_WIDTH,
-            ),
-            AUXILIARY_RADIUS.into(),
-        );
-        let status = match (self.enabled, state.pressed, cursor.is_over(bounds)) {
-            (false, _, _) => Status::Disabled,
-            (true, true, true) => Status::Pressed,
-            (true, _, true) => Status::Hovered,
-            (true, _, false) => Status::Active,
-        };
-        let style = theme::button::auxiliary(theme, status);
-        frame.stroke(
-            &path,
-            Stroke {
-                line_dash: LineDash {
-                    segments: AUXILIARY_DASH,
-                    offset: 0,
-                },
-                ..Stroke::default()
-            }
-            .with_color(style.border.color)
-            .with_width(AUXILIARY_BORDER_WIDTH),
-        );
-        vec![frame.into_geometry()]
-    }
+    .width(Length::Fill)
 }
 
 fn content_with_tooltip<'a, T: 'a>(
@@ -764,11 +669,11 @@ pub fn btn_generate_address<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> 
 }
 
 pub fn btn_add_key<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
-    auxiliary(Some(icon::plus_icon()), "Add a key", msg).width(Length::Fill)
+    auxiliary(Some(icon::plus_icon()), "Add a key", msg)
 }
 
 pub fn btn_add_recovery_path<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
-    auxiliary(Some(icon::plus_icon()), "Add a recovery path", msg).width(Length::Fill)
+    auxiliary(Some(icon::plus_icon()), "Add a recovery path", msg)
 }
 
 pub fn btn_skip<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
@@ -776,7 +681,7 @@ pub fn btn_skip<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
 }
 
 pub fn btn_skip_registration<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
-    auxiliary(None, "Skip registration", msg).width(Length::Fill)
+    auxiliary(None, "Skip registration", msg)
 }
 
 pub fn btn_resend_token<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
@@ -793,7 +698,7 @@ pub fn btn_change_email<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
 }
 
 pub fn btn_connect_another_email<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
-    auxiliary(None, "Connect with another email", msg).width(Length::Fill)
+    auxiliary(None, "Connect with another email", msg)
 }
 
 pub fn btn_verify_compact<'a, T: Clone + 'a>(msg: T) -> Button<'a, T> {

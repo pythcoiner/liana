@@ -1,3 +1,4 @@
+use iced::border::Dash;
 use iced::widget::button::{Catalog, Status, Style, StyleFn};
 use iced::{Background, Border, Color};
 
@@ -6,6 +7,8 @@ use super::palette::Button;
 use super::Theme;
 
 pub const BUTTON_RADIUS: f32 = 12.0;
+/// On/off length of the auxiliary button's dashed border, in logical pixels.
+const AUXILIARY_DASH: f32 = 6.0;
 
 impl Catalog for Theme {
     type Class<'a> = StyleFn<'a, Self>;
@@ -49,8 +52,11 @@ button_styles!(
 );
 
 pub fn auxiliary(theme: &Theme, status: Status) -> Style {
-    let mut style = button(&theme.colors.buttons.auxiliary, status, 0.0);
+    let mut style = button(&theme.colors.buttons.auxiliary, status, 1.0);
     style.border.radius = CARD_RADIUS.into();
+    style.border = style
+        .border
+        .dashes(Dash::new(AUXILIARY_DASH, AUXILIARY_DASH));
     style
 }
 
@@ -159,6 +165,7 @@ fn button(p: &Button, status: Status, width: f32) -> Style {
                     radius: BUTTON_RADIUS.into(),
                     width,
                     color,
+                    ..Default::default()
                 }
             } else {
                 Border {
@@ -178,6 +185,7 @@ fn button(p: &Button, status: Status, width: f32) -> Style {
                             radius: BUTTON_RADIUS.into(),
                             width,
                             color,
+                            ..Default::default()
                         }
                     } else {
                         Border {
@@ -199,6 +207,7 @@ fn button(p: &Button, status: Status, width: f32) -> Style {
                     radius: BUTTON_RADIUS.into(),
                     width,
                     color,
+                    ..Default::default()
                 }
             } else {
                 Border {
@@ -218,6 +227,7 @@ fn button(p: &Button, status: Status, width: f32) -> Style {
                             radius: BUTTON_RADIUS.into(),
                             width,
                             color,
+                            ..Default::default()
                         }
                     } else {
                         Border {

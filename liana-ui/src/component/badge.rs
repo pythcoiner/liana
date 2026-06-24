@@ -255,6 +255,7 @@ fn tile_style(theme: &theme::Theme, tone: TileToneName, radius: f32) -> Style {
             radius: radius.into(),
             width: 0.0,
             color: iced::Color::TRANSPARENT,
+            ..Default::default()
         },
         ..Default::default()
     }

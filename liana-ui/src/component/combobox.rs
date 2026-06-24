@@ -358,6 +358,7 @@ fn menu_panel(theme: &theme::Theme) -> container::Style {
             color: menu.border,
             width: 1.0,
             radius: 4.0.into(),
+            ..Default::default()
         },
         shadow: MENU_SHADOW,
         ..container::Style::default()
