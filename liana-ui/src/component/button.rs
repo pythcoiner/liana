@@ -39,6 +39,8 @@ const ICON_BTN_SIZE: f32 = 40.0;
 const ICON_BTN_PADDING: f32 = 10.0;
 pub const DEVICE_BTN_H: u32 = 40;
 
+pub type ListEntryAccent = fn(&Theme) -> Color;
+
 pub fn menu<'a, T: 'a>(icon: Option<Text<'a>>, t: &'static str, compact: bool) -> Button<'a, T> {
     Button::new(
         content_menu(
@@ -175,7 +177,7 @@ pub fn breadcrumb<'a, T: 'a>(icon: Option<Text<'a>>, t: &'static str) -> Button<
 
 pub fn list_entry<'a, M: 'a + Clone, T: Into<Element<'a, M>>>(
     content: T,
-    accent: Option<Color>,
+    accent: Option<ListEntryAccent>,
     width: EntryWidth,
     msg: Option<M>,
 ) -> Element<'a, M> {
@@ -188,8 +190,8 @@ pub fn list_entry<'a, M: 'a + Clone, T: Into<Element<'a, M>>>(
         row![
             container(Space::fill_height())
                 .width(LIST_ENTRY_ACCENT_WIDTH)
-                .style(move |_| container::Style {
-                    background: Some(Background::Color(color)),
+                .style(move |theme| container::Style {
+                    background: Some(Background::Color(color(theme))),
                     ..Default::default()
                 }),
             button
@@ -231,8 +233,8 @@ fn auxiliary_content<'a, T: 'a>(
         ),
     }
     .align_x(Horizontal::Center)
-        .padding(AUXILIARY_PADDING)
-        .width(Length::Fill);
+    .padding(AUXILIARY_PADDING)
+    .width(Length::Fill);
     Stack::new().push(content).push(
         Canvas::<AuxiliaryBorder, T, Theme, Renderer>::new(AuxiliaryBorder { enabled })
             .width(Length::Fill)
