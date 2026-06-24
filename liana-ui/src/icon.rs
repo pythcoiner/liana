@@ -81,11 +81,11 @@ pub fn reload_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F130}')
 }
 
-pub fn import_icon() -> Text<'static> {
+pub fn import_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F30A}')
 }
 
-pub fn wallet_icon() -> Text<'static> {
+pub fn wallet_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F615}')
 }
 
@@ -101,7 +101,7 @@ pub fn dot_icon() -> Text<'static> {
     bootstrap_icon('\u{F287}')
 }
 
-pub fn person_icon() -> Text<'static> {
+pub fn person_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F4DA}')
 }
 
@@ -117,15 +117,15 @@ pub fn minus_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F63B}')
 }
 
-pub fn warning_icon() -> Text<'static> {
+pub fn warning_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F33B}')
 }
 
-pub fn shield_icon() -> Text<'static> {
+pub fn shield_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F53F}')
 }
 
-pub fn lock_icon() -> Text<'static> {
+pub fn lock_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F47B}')
 }
 
@@ -177,7 +177,7 @@ pub fn check_mark_icon<'a>() -> Text<'a> {
     bootstrap_icon_no_padding('\u{F633}')
 }
 
-pub fn round_key_icon() -> Text<'static> {
+pub fn round_key_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F44E}')
 }
 
@@ -189,7 +189,7 @@ pub fn restore_icon() -> Text<'static> {
     bootstrap_icon('\u{F358}')
 }
 
-pub fn wrench_icon() -> Text<'static> {
+pub fn wrench_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F621}')
 }
 
@@ -197,7 +197,7 @@ pub fn link_icon() -> Text<'static> {
     bootstrap_icon('\u{F470}')
 }
 
-pub fn paste_icon() -> Text<'static> {
+pub fn paste_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F290}')
 }
 
@@ -205,7 +205,7 @@ pub fn usb_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F6DC}')
 }
 
-pub fn usb_drive_icon() -> Text<'static> {
+pub fn usb_drive_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F6F2}')
 }
 
@@ -221,7 +221,7 @@ pub fn collection_icon() -> Text<'static> {
     bootstrap_icon('\u{F2CC}')
 }
 
-pub fn org_icon() -> Text<'static> {
+pub fn org_icon<'a>() -> Text<'a> {
     bootstrap_icon('\u{F876}')
 }
 
@@ -289,6 +289,6 @@ pub fn circle_cross_icon() -> Text<'static> {
     iconex_icon('\u{19DA}')
 }
 
-pub fn scale_icon() -> Text<'static> {
+pub fn scale_icon<'a>() -> Text<'a> {
     liana_icon('\u{E001}')
 }

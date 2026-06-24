@@ -28,3 +28,18 @@ pub fn bitcoin(theme: &Theme) -> Style {
 pub fn success(theme: &Theme) -> Style {
     badge(&theme.colors.badges.success)
 }
+
+pub fn avatar(theme: &Theme) -> Style {
+    let palette = &theme.colors.badges.avatar;
+    Style {
+        background: Some(Background::Color(palette.background)),
+        text_color: palette.text,
+        border: Border {
+            radius: (crate::component::badge::AVATAR_SIZE as f32 / 2.0).into(),
+            width: 0.0,
+            color: iced::Color::TRANSPARENT,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}

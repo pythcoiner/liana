@@ -544,7 +544,31 @@ impl Palette {
                     text: color::BLACK.into(),
                     border: color::TRANSPARENT.into(),
                 },
+                avatar: ContainerPalette {
+                    background: color::FINGERPRINT_BACKGROUND,
+                    text: color::GREY_2.into(),
+                    border: color::TRANSPARENT.into(),
+                },
                 danger: None,
+            },
+            tile_tones: TileTones {
+                background: color::GREY_5,
+                accent: TileTone {
+                    fg: color::GREEN,
+                    bg: None,
+                },
+                neutral: TileTone {
+                    fg: SAFETY_NET,
+                    bg: None,
+                },
+                muted: TileTone {
+                    fg: color::GREY_3,
+                    bg: None,
+                },
+                danger: TileTone {
+                    fg: color::RED,
+                    bg: Some(color::LIGHT_BLACK),
+                },
             },
             pills: Pills {
                 simple: ContainerPalette {
