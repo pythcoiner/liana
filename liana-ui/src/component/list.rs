@@ -1,6 +1,10 @@
 use std::fmt::Display;
 
-use iced::{alignment::Horizontal, widget::row, Alignment, Length};
+use iced::{
+    alignment::Horizontal,
+    widget::{column, row},
+    Alignment, Length,
+};
 
 use crate::{
     component::{
@@ -9,7 +13,7 @@ use crate::{
         text::{self, new::caption},
     },
     icon, theme,
-    widget::{Button, Column, ColumnExt, Container, Element, Row, RowExt},
+    widget::{Button, Container, Element, Row, RowExt},
 };
 
 const PATH_DELETE_SLOT_WIDTH: f32 = 24.0;
@@ -89,6 +93,13 @@ pub fn list_entry_row<'a, M: Clone + 'a>(
     button::list_entry(content, accent, width, msg)
 }
 
+pub fn entry_chevron<'a, M: 'a>() -> Element<'a, M> {
+    icon::chevron_right()
+        .size(18)
+        .style(theme::text::secondary)
+        .into()
+}
+
 pub fn entry_organization<'a, M: Clone + 'a>(
     title: impl Display,
     subtitle: Option<impl Display>,
@@ -97,7 +108,7 @@ pub fn entry_organization<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     list_entry_row(
         Some(badge::tile(TileName::Org).into()),
-        container_body(title, subtitle),
+        section_body(title, subtitle),
         trailing,
         None,
         EntryWidth::Standard,
@@ -105,38 +116,47 @@ pub fn entry_organization<'a, M: Clone + 'a>(
     )
 }
 
-/// Width of the delete-button slot on a login account row (also a spacer to align siblings).
-pub const ACCOUNT_DELETE_SLOT_WIDTH: f32 = 40.0;
-
-/// A login account row: the account entry (tile + email + chevron) followed by a delete button.
+/// A login account row: the account entry (tile + email + chevron) followed by a delete
+/// button. While `connecting`, the email is replaced by a centered "Connecting..." label
+/// and the row is inert (both buttons disabled).
 pub fn account_entry<'a, M: Clone + 'a>(
     email: impl Display,
+    connecting: bool,
     on_select: Option<M>,
     on_delete: Option<M>,
 ) -> Element<'a, M> {
-    let entry = leaf_entry(
-        TileName::Account,
-        email,
-        None::<String>,
-        Some(
-            icon::chevron_right()
-                .size(18)
-                .style(theme::text::secondary)
-                .into(),
-        ),
+    let (on_select, on_delete) = if connecting {
+        (None, None)
+    } else {
+        (on_select, on_delete)
+    };
+
+    let body: Element<'a, M> = if connecting {
+        text::new::b5_medium("Connecting...")
+            .width(Length::Fill)
+            .align_x(Horizontal::Center)
+            .into()
+    } else {
+        item_body(email, None::<String>)
+    };
+
+    let entry = list_entry_row(
+        Some(badge::tile(TileName::Account).into()),
+        body,
+        Some(entry_chevron()),
         None,
-        EntryWidth::Fill,
+        EntryWidth::Deletable,
         on_select,
     );
 
     row![
         entry,
         Container::new(button::btn_remove(on_delete))
-            .center_x(Length::Fixed(ACCOUNT_DELETE_SLOT_WIDTH))
+            .center_x(Length::Fixed(button::ENTRY_DELETE_SLOT))
     ]
-    .spacing(10)
+    .spacing(button::ENTRY_DELETE_GAP)
     .align_y(Alignment::Center)
-    .width(Length::Fill)
+    .width(Length::Shrink)
     .into()
 }
 
@@ -214,20 +234,42 @@ pub fn entry_set_key<'a, M: Clone + 'a>(
 
 pub fn entry_register<'a, M: Clone + 'a>(
     status: EntryRegisterStatus,
-    title: impl Display,
-    subtitle: Option<impl Display>,
+    body: impl Into<Element<'a, M>>,
     trailing: Option<Element<'a, M>>,
+    enabled: bool,
     msg: Option<M>,
 ) -> Element<'a, M> {
-    leaf_entry(
-        TileName::Device,
-        title,
-        subtitle,
+    list_entry_row_with_enabled(
+        Some(badge::tile(TileName::Device).into()),
+        body,
         trailing,
         Some(register_accent(status)),
         EntryWidth::Standard,
+        enabled,
         msg,
     )
+}
+
+fn list_entry_row_with_enabled<'a, M: Clone + 'a>(
+    tile: Option<Element<'a, M>>,
+    body: impl Into<Element<'a, M>>,
+    trailing: Option<Element<'a, M>>,
+    accent: Option<ListEntryAccent>,
+    width: EntryWidth,
+    enabled: bool,
+    msg: Option<M>,
+) -> Element<'a, M> {
+    let body = Container::new(body).width(Length::Fill);
+    let trailing = trailing.map(|trailing| Container::new(trailing).align_y(Alignment::Center));
+    let content = row![]
+        .push_maybe(tile)
+        .push(body)
+        .push_maybe(trailing)
+        .spacing(16)
+        .align_y(Alignment::Center)
+        .width(Length::Fill);
+
+    button::list_entry_with_enabled(content, accent, width, enabled, msg)
 }
 
 pub fn entry_device_list<'a, M: Clone + 'a>(
@@ -311,7 +353,7 @@ fn leaf_entry<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     list_entry_row(
         Some(badge::tile(tile).into()),
-        leaf_body(title, subtitle),
+        item_body(title, subtitle),
         trailing,
         accent,
         width,
@@ -319,14 +361,11 @@ fn leaf_entry<'a, M: Clone + 'a>(
     )
 }
 
-fn container_body<'a, M: 'a>(
-    title: impl Display,
-    subtitle: Option<impl Display>,
-) -> Element<'a, M> {
+fn section_body<'a, M: 'a>(title: impl Display, subtitle: Option<impl Display>) -> Element<'a, M> {
     body(text::new::h3_semi(title), subtitle)
 }
 
-fn leaf_body<'a, M: 'a>(title: impl Display, subtitle: Option<impl Display>) -> Element<'a, M> {
+fn item_body<'a, M: 'a>(title: impl Display, subtitle: Option<impl Display>) -> Element<'a, M> {
     body(text::new::b5_medium(title), subtitle)
 }
 
@@ -335,10 +374,13 @@ fn wallet_body<'a, M: 'a>(
     role: Option<Element<'a, M>>,
     subtitle: Option<impl Display>,
 ) -> Element<'a, M> {
-    let title = row![text::new::h3_semi(title)]
-        .push_maybe(role)
-        .spacing(10)
-        .align_y(Alignment::Start);
+    let title = if let Some(role) = role {
+        row![text::new::h3_semi(title), role]
+    } else {
+        row![text::new::h3_semi(title)]
+    }
+    .spacing(10)
+    .align_y(Alignment::Start);
     let subtitle: Option<Element<'a, M>> = subtitle.map(|subtitle| {
         Container::new(text::new::caption(subtitle).style(theme::text::tertiary))
             .padding(iced::Padding {
@@ -347,10 +389,12 @@ fn wallet_body<'a, M: 'a>(
             })
             .into()
     });
-    let content = Column::new()
-        .push(title)
-        .push_maybe(subtitle)
-        .width(Length::Fill);
+    let content = if let Some(subtitle) = subtitle {
+        column![title, subtitle]
+    } else {
+        column![title]
+    }
+    .width(Length::Fill);
 
     Container::new(content).width(Length::Fill).into()
 }
@@ -372,7 +416,7 @@ fn key_body<'a, M: 'a>(
             ..iced::Padding::ZERO
         })
         .width(Length::Fill);
-    let content = Column::new().push(title).push(signer).width(Length::Fill);
+    let content = column![title, signer].width(Length::Fill);
 
     Container::new(content).width(Length::Fill).into()
 }
@@ -384,13 +428,14 @@ fn path_body<'a, M: 'a>(
     key_pills: Vec<Element<'a, M>>,
     trailing: Option<Element<'a, M>>,
 ) -> Element<'a, M> {
-    let title_block = Column::new().push(text::new::h3_semi(title)).push(
+    let title_block = column![
+        text::new::h3_semi(title),
         Container::new(caption(summary).style(theme::text::tertiary)).padding(iced::Padding {
             top: 2.0,
             ..iced::Padding::ZERO
         }),
-    );
-    let trailing = Container::new(trailing.unwrap_or_else(|| Row::new().into()))
+    ];
+    let trailing = Container::new(trailing.unwrap_or_else(|| row![].into()))
         .width(Length::Fixed(PATH_DELETE_SLOT_WIDTH))
         .align_x(Horizontal::Center)
         .align_y(Alignment::Center);
@@ -403,14 +448,15 @@ fn path_body<'a, M: 'a>(
     .align_y(Alignment::Start)
     .width(Length::Fill);
     let pills = Row::with_children(key_pills).spacing(9).wrap();
-    Column::new()
-        .push(header)
-        .push(Container::new(pills).padding(iced::Padding {
+    column![
+        header,
+        Container::new(pills).padding(iced::Padding {
             top: 10.0,
             ..iced::Padding::ZERO
-        }))
-        .width(Length::Fill)
-        .into()
+        })
+    ]
+    .width(Length::Fill)
+    .into()
 }
 
 fn body<'a, M: 'a>(
@@ -422,11 +468,13 @@ fn body<'a, M: 'a>(
             .style(theme::text::secondary)
             .into()
     });
-    let content = Column::new()
-        .push(title)
-        .push_maybe(subtitle)
-        .spacing(2)
-        .width(Length::Fill);
+    let content = if let Some(subtitle) = subtitle {
+        column![title, subtitle]
+    } else {
+        column![title]
+    }
+    .spacing(2)
+    .width(Length::Fill);
 
     Container::new(content).width(Length::Fill).into()
 }

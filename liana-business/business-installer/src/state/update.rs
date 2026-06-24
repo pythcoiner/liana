@@ -360,8 +360,9 @@ impl State {
                 self.start_hw();
 
                 // Populate registration state from wallet data
-                self.views.registration.descriptor = wallet.descriptor.clone();
-                self.views.registration.user_devices = wallet.user_devices(&user_email);
+                self.views
+                    .registration
+                    .load_wallet(wallet.descriptor.clone(), wallet.user_devices(&user_email));
                 return Task::none();
             }
         }
@@ -1473,8 +1474,9 @@ impl State {
                     devices.len(),
                     descriptor_len
                 );
-                self.views.registration.descriptor = wallet.descriptor.clone();
-                self.views.registration.user_devices = devices;
+                self.views
+                    .registration
+                    .sync_wallet(wallet.descriptor.clone(), devices);
                 debug!(
                     "on_backend_wallet: user_devices: {:?}",
                     self.views.registration.user_devices
@@ -1522,8 +1524,9 @@ impl State {
                     }
 
                     // Set up registration state (mirrors on_org_wallet_selected pattern)
-                    self.views.registration.descriptor = wallet.descriptor.clone();
-                    self.views.registration.user_devices = wallet.user_devices(email);
+                    self.views
+                        .registration
+                        .load_wallet(wallet.descriptor.clone(), wallet.user_devices(email));
 
                     // Start hardware wallet listening for registration
                     self.start_hw();
@@ -2490,7 +2493,8 @@ impl State {
             proof.as_ref().map(|p| p.len())
         );
 
-        // Send DeviceRegistered request to server
+        // Send DeviceRegistered request to server. The device is marked registered only when
+        // the backend confirms it via the next wallet sync, never optimistically here.
         self.backend.device_registered(wallet_id, infos);
 
         // Close modal (keep HW listening for next device)
