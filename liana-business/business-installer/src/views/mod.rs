@@ -6,6 +6,7 @@ pub mod org_select;
 pub mod paths;
 pub mod registration;
 pub mod template_builder;
+pub mod wallet_edit;
 pub mod wallet_select;
 pub mod xpub;
 
@@ -20,9 +21,12 @@ pub use template_builder::template_builder_view;
 pub use wallet_select::wallet_select_view;
 pub use xpub::xpub_view;
 
-use crate::{backend::Backend, state::message::Msg, state::State};
+use crate::{
+    backend::Backend,
+    state::{message::Msg, State},
+};
 use iced::{
-    widget::{container, row, rule, Space},
+    widget::{column, container, row, rule, Space},
     Alignment, Length, Padding,
 };
 use liana_ui::{
@@ -81,7 +85,7 @@ const CONTENT_TOP_SPACING: u32 = 72;
 const SCREEN_INTRO_SUB_WIDTH: u32 = 620;
 
 fn breadcrumb_header<'a>(segments: &[String]) -> Element<'a, Msg> {
-    let mut row = Row::new().spacing(10).align_y(Alignment::Center);
+    let mut row = row![].spacing(10).align_y(Alignment::Center);
 
     for (i, segment) in segments.iter().enumerate() {
         if i > 0 {
@@ -130,7 +134,7 @@ fn layout_inner<'a>(
     };
     let left_button = btn_breadcrumb_previous(msg);
 
-    let mut user = Row::new().spacing(12).align_y(Alignment::Center);
+    let mut user = row![].spacing(12).align_y(Alignment::Center);
 
     if is_ws_admin {
         user = user.push(liana_ui::component::pill::ws_admin());
@@ -142,7 +146,7 @@ fn layout_inner<'a>(
             .push(text::new::caption(e).style(theme::text::accent));
     }
 
-    let top_strip = Container::new(row![Space::with_width(Length::Fill), user])
+    let top_strip = Container::new(row![Space::fill_width(), user])
         .height(TOP_STRIP_HEIGHT)
         .width(Length::Fill)
         .padding([0, 28])
@@ -151,33 +155,33 @@ fn layout_inner<'a>(
 
     let progress = if progress.1 > 0 {
         Element::from(
-            Row::new()
-                .align_y(Alignment::Center)
-                .push(text::new::caption(progress.0.to_string()).style(theme::text::accent))
-                .push(text::new::caption(format!(" | {}", progress.1))),
+            row![
+                text::new::caption(progress.0.to_string()).style(theme::text::accent),
+                text::new::caption(format!(" | {}", progress.1)),
+            ]
+            .align_y(Alignment::Center),
         )
     } else {
-        Element::from(Space::with_width(Length::Fill))
+        Element::from(Space::fill_width())
+    };
+    let left_slot: Element<'a, Msg> = if has_left_button {
+        Container::new(left_button)
+            .center_x(Length::FillPortion(2))
+            .into()
+    } else {
+        Space::with_width(Length::FillPortion(2)).into()
     };
     let header = Container::new(
-        Row::new()
-            .align_y(Alignment::Center)
-            .push(if has_left_button {
-                Container::new(left_button)
-                    .center_x(Length::FillPortion(2))
-                    .into()
-            } else {
-                Element::from(Space::with_width(Length::FillPortion(2)))
-            })
-            .push(Container::new(breadcrumb_header(breadcrumb)).width(Length::FillPortion(8)))
-            .push(Container::new(progress).center_x(Length::FillPortion(2))),
+        row![
+            left_slot,
+            Container::new(breadcrumb_header(breadcrumb)).width(Length::FillPortion(8)),
+            Container::new(progress).center_x(Length::FillPortion(2)),
+        ]
+        .align_y(Alignment::Center),
     )
     .padding([20, 0]);
 
-    let layout_header = Column::new()
-        .push(top_strip)
-        .push(thin_separator())
-        .push(header);
+    let layout_header = column![top_strip, thin_separator(), header];
 
     let fill_portion = if padding_left { 8 } else { 10 };
     let right_spacer = || -> Option<Space> {
@@ -190,26 +194,25 @@ fn layout_inner<'a>(
 
     match content {
         LayoutContent::Scrollable(inner) => {
-            let content_row = Row::new()
-                .push(Space::with_width(Length::FillPortion(2)))
-                .push(
-                    Container::new(
-                        Column::new()
-                            .push(Space::with_height(Length::Fixed(
-                                CONTENT_TOP_SPACING as f32,
-                            )))
-                            .push(inner),
-                    )
-                    .width(Length::FillPortion(fill_portion)),
-                )
-                .push_maybe(right_spacer());
+            let content_body = Container::new(column![
+                Space::with_height(Length::Fixed(CONTENT_TOP_SPACING as f32)),
+                inner,
+            ])
+            .width(Length::FillPortion(fill_portion));
+            let left_spacer = Space::with_width(Length::FillPortion(2));
+            let content_row = if let Some(spacer) = right_spacer() {
+                row![left_spacer, content_body, spacer]
+            } else {
+                row![left_spacer, content_body]
+            };
 
             Container::new(
-                Column::new()
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .push(layout_header)
-                    .push(scrollable::vertical(content_row).height(Length::Fill)),
+                column![
+                    layout_header,
+                    scrollable::vertical(content_row).height(Length::Fill),
+                ]
+                .width(Length::Fill)
+                .height(Length::Fill),
             )
             .center_x(Length::Fill)
             .height(Length::Fill)
@@ -224,49 +227,56 @@ fn layout_inner<'a>(
             footer,
         } => {
             let header_area = header_content.map(|header_content| {
-                Row::new()
-                    .push(Space::with_width(Length::FillPortion(2)))
-                    .push(
-                        Container::new(header_content)
-                            .width(Length::FillPortion(fill_portion))
-                            .padding(Padding {
-                                top: 22.0,
-                                bottom: 14.0,
-                                ..Padding::ZERO
-                            }),
-                    )
-                    .push_maybe(right_spacer())
+                let body = Container::new(header_content)
+                    .width(Length::FillPortion(fill_portion))
+                    .padding(Padding {
+                        top: 22.0,
+                        bottom: 14.0,
+                        ..Padding::ZERO
+                    });
+                let left = Space::with_width(Length::FillPortion(2));
+                if let Some(spacer) = right_spacer() {
+                    row![left, body, spacer]
+                } else {
+                    row![left, body]
+                }
             });
 
-            let list_area = Row::new()
-                .push(Space::with_width(Length::FillPortion(2)))
-                .push(
-                    Container::new(scrollable::vertical(list).height(Length::Fill))
-                        .width(Length::FillPortion(fill_portion))
-                        .height(Length::Fill)
-                        .align_x(Alignment::Center),
-                )
-                .push_maybe(right_spacer())
-                .height(Length::Fill);
+            let list_body = Container::new(scrollable::vertical(list).height(Length::Fill))
+                .width(Length::FillPortion(fill_portion))
+                .height(Length::Fill)
+                .align_x(Alignment::Center);
+            let list_left = Space::with_width(Length::FillPortion(2));
+            let list_area = if let Some(spacer) = right_spacer() {
+                row![list_left, list_body, spacer]
+            } else {
+                row![list_left, list_body]
+            }
+            .height(Length::Fill);
 
             let pinned_area: Option<Row<'a, Msg>> = pinned.map(|p| {
-                Row::new()
-                    .push(Space::with_width(Length::FillPortion(2)))
-                    .push(Container::new(p).width(Length::FillPortion(fill_portion)))
-                    .push_maybe(right_spacer())
+                let body = Container::new(p).width(Length::FillPortion(fill_portion));
+                let left = Space::with_width(Length::FillPortion(2));
+                if let Some(spacer) = right_spacer() {
+                    row![left, body, spacer]
+                } else {
+                    row![left, body]
+                }
             });
             let footer_area: Option<Row<'a, Msg>> = footer.map(|f| {
-                Row::new()
-                    .push(Space::with_width(Length::FillPortion(2)))
-                    .push(Container::new(f).width(Length::FillPortion(fill_portion)))
-                    .push_maybe(right_spacer())
+                let body = Container::new(f).width(Length::FillPortion(fill_portion));
+                let left = Space::with_width(Length::FillPortion(2));
+                if let Some(spacer) = right_spacer() {
+                    row![left, body, spacer]
+                } else {
+                    row![left, body]
+                }
             });
 
             Container::new(
-                Column::new()
+                column![layout_header]
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .push(layout_header)
                     .push_maybe(header_area)
                     .push(list_area)
                     .push_maybe(pinned_area)
@@ -332,26 +342,39 @@ pub fn layout_with_scrollable_list<'a>(
     )
 }
 
-pub fn screen_intro<'a, M: 'a>(title: impl Display + 'a, sub: Option<&'a str>) -> Element<'a, M> {
-    let sub = sub.map(|sub| {
-        Container::new(text::new::caption(sub).style(theme::text::secondary))
-            .width(Length::Shrink)
-            .max_width(SCREEN_INTRO_SUB_WIDTH)
-            .align_x(Alignment::Center)
-            .padding(Padding {
-                top: 6.0,
-                ..Padding::ZERO
-            })
-    });
-
-    Column::new()
+pub fn screen_intro<'a, M: 'a>(
+    title: impl Display + 'a,
+    sub: Option<Element<'a, M>>,
+) -> Element<'a, M> {
+    column![text::new::d3(title), sub]
         .align_x(Alignment::Center)
         .padding(Padding {
             bottom: 24.0,
             ..Padding::ZERO
         })
-        .push(text::new::d3(title))
-        .push_maybe(sub)
+        .into()
+}
+
+pub fn intro_description<'a, M: 'a>(text: &'a str) -> Element<'a, M> {
+    Container::new(text::new::caption(text).style(theme::text::secondary))
+        .width(Length::Shrink)
+        .max_width(SCREEN_INTRO_SUB_WIDTH)
+        .align_x(Alignment::Center)
+        .padding(Padding {
+            top: 6.0,
+            ..Padding::ZERO
+        })
+        .into()
+}
+
+pub fn intro_prompt<'a, M: 'a>(prompt: &'a str, accent: Option<&'a str>) -> Element<'a, M> {
+    let accent = accent.map(|accent| text::new::h3_semi(accent).style(theme::text::accent));
+    Container::new(row![text::new::h3_semi(prompt), accent])
+        .center_x(Length::Fill)
+        .padding(Padding {
+            top: 20.0,
+            ..Padding::ZERO
+        })
         .into()
 }
 
@@ -370,6 +393,7 @@ pub fn menu_key_entry(
     kind_pill: Element<'static, Msg>,
     trailing: Element<'static, Msg>,
     msg: Option<Msg>,
+    on_delete: Option<Msg>,
 ) -> Element<'static, Msg> {
     let alias = truncate(&key.alias, 25);
 
@@ -380,6 +404,7 @@ pub fn menu_key_entry(
         short_email(&signer, 40),
         Some(trailing),
         msg,
+        on_delete,
     )
 }
 
@@ -427,11 +452,10 @@ pub struct SelectListView<'a> {
 }
 
 pub fn select_list_view(cfg: SelectListView<'_>) -> Element<'_, Msg> {
-    let mut header = Column::new()
+    let mut header = column![screen_intro(cfg.title, None)]
         .spacing(10)
         .align_x(Alignment::Center)
-        .padding(20)
-        .push(screen_intro(cfg.title, None));
+        .padding(20);
 
     if let Some(search) = cfg.search {
         let value = form::Value {

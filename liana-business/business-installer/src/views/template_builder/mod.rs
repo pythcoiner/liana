@@ -2,7 +2,11 @@ use crate::{
     backend::Backend,
     state::{message::Msg, State},
 };
-use iced::{alignment::Horizontal, Alignment, Length};
+use iced::{
+    alignment::Horizontal,
+    widget::{column, row},
+    Alignment, Length,
+};
 use liana_connect::ws_business::{UserRole, WalletStatus};
 use liana_ui::{
     component::{
@@ -13,7 +17,7 @@ use liana_ui::{
     widget::*,
 };
 
-use super::layout_with_scrollable_list;
+use super::{layout_with_scrollable_list, wallet_edit::wallet_edit_tab_header};
 
 pub mod entry_path_list;
 
@@ -35,11 +39,12 @@ fn banner_card(
     icon_style: fn(&theme::Theme) -> iced::widget::text::Style,
     body: &'static str,
 ) -> Element<'static, Msg> {
-    let content = Row::new()
-        .push(tooltip::tooltip_with_style(body, icon_style))
-        .push(text::new::caption(body).style(icon_style))
-        .spacing(10)
-        .align_y(Alignment::Center);
+    let content = row![
+        tooltip::tooltip_with_style(body, icon_style),
+        text::new::caption(body).style(icon_style),
+    ]
+    .spacing(10)
+    .align_y(Alignment::Center);
 
     variant(content.into())
 }
@@ -88,9 +93,7 @@ fn footer_content(
         btn_unlock(Some(Msg::TemplateUnlock)).into()
     } else if is_manager && is_locked {
         let help = button::btn_template_help(Some(Msg::TemplateHelpShowModal));
-        Column::new()
-            .push(btn_approve(Some(Msg::TemplateValidate)))
-            .push(help)
+        column![btn_approve(Some(Msg::TemplateValidate)), help]
             .spacing(12)
             .align_x(Horizontal::Center)
             .into()
@@ -126,7 +129,13 @@ pub fn template_builder_view(state: &State) -> Element<'_, Msg> {
     let editable = is_ws_admin && !is_locked;
 
     let list_content = entry_path_list(state, editable);
-    let header_content = header_content(is_ws_admin, is_manager, is_locked);
+    let header_content = if let Some(banner) = header_content(is_ws_admin, is_manager, is_locked) {
+        column![wallet_edit_tab_header(state), banner]
+    } else {
+        column![wallet_edit_tab_header(state)]
+    }
+    .align_x(Alignment::Center)
+    .into();
     let pinned_content =
         editable.then(|| btn_add_recovery_path(Some(Msg::TemplateNewPathModal)).into());
     let footer_content = footer_content(
@@ -148,14 +157,14 @@ pub fn template_builder_view(state: &State) -> Element<'_, Msg> {
         .and_then(|wallet_id| state.backend.get_wallet(wallet_id))
         .map(|wallet| wallet.alias.clone())
         .unwrap_or_else(|| "Wallet".to_string());
-    let breadcrumb = vec![org_name, wallet_name, "Template".to_string()];
+    let breadcrumb = vec![org_name, wallet_name];
 
     layout_with_scrollable_list(
         (0, 0),
         Some(current_user_email),
         is_ws_admin,
         &breadcrumb,
-        header_content,
+        Some(header_content),
         list_content,
         pinned_content,
         footer_content,
