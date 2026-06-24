@@ -1,6 +1,7 @@
 use crate::{color, component::text::text, icon, theme, widget::*};
 use iced::{widget::button, Alignment, Padding};
 const CARD_PADDING: [u16; 2] = [15, 30];
+const SOFT_CARD_PADDING: [u16; 2] = [13, 16];
 
 pub fn modal<'a, T: 'a, C: Into<Element<'a, T>>>(content: C) -> Container<'a, T> {
     Container::new(content)
@@ -21,6 +22,10 @@ pub fn flat<'a, T: 'a, C: Into<Element<'a, T>>>(
     Container::new(content)
         .padding(padding)
         .style(theme::card::flat)
+}
+
+pub fn section<'a, T: 'a, C: Into<Element<'a, T>>>(content: C) -> Container<'a, T> {
+    Container::new(content).style(theme::card::section)
 }
 
 pub fn invalid<'a, T: 'a, C: Into<Element<'a, T>>>(content: C) -> Container<'a, T> {
@@ -100,13 +105,15 @@ where
         .into()
 }
 
+// Tinted soft-callout cards. Padding is the compact [13,16] for every consumer; the radius
+// branches by theme in theme::card (business 12, wallet 16).
 pub fn soft_warning<'a, T, M>(content: T) -> Element<'a, M>
 where
     T: Into<Element<'a, M>>,
     M: Clone + 'a,
 {
     Container::new(content)
-        .padding(CARD_PADDING)
+        .padding(SOFT_CARD_PADDING)
         .style(theme::card::soft_warning)
         .into()
 }
@@ -117,7 +124,18 @@ where
     M: Clone + 'a,
 {
     Container::new(content)
-        .padding(CARD_PADDING)
+        .padding(SOFT_CARD_PADDING)
         .style(theme::card::info)
+        .into()
+}
+
+pub fn success<'a, T, M>(content: T) -> Element<'a, M>
+where
+    T: Into<Element<'a, M>>,
+    M: Clone + 'a,
+{
+    Container::new(content)
+        .padding(SOFT_CARD_PADDING)
+        .style(theme::card::success)
         .into()
 }
