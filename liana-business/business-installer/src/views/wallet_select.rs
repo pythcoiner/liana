@@ -2,7 +2,10 @@ use crate::{
     backend::Backend,
     state::{Msg, State},
 };
-use iced::{widget::row, Alignment};
+use iced::{
+    widget::{column, row},
+    Alignment, Length,
+};
 use liana_connect::ws_business::{KeyIdentity, UserRole, Wallet, WalletStatus};
 use liana_ui::{
     component::{
@@ -10,7 +13,7 @@ use liana_ui::{
         pill,
         text::{self, truncate},
     },
-    icon, theme,
+    theme,
     widget::*,
 };
 
@@ -100,31 +103,9 @@ pub fn wallet_card<'a>(
     last_edit_info: Option<String>,
     user_email: &str,
 ) -> Element<'a, Msg> {
-    let key_count = wallet.template.as_ref().map(|template| template.keys.len());
     let alias = truncate(&wallet.alias, 25);
-    let key_count: Option<Element<'static, Msg>> = key_count.and_then(|count| match count {
-        0 => None,
-        1 => Some(
-            text::new::caption("(1 key)")
-                .style(liana_ui::theme::text::secondary)
-                .into(),
-        ),
-        count => Some(
-            text::new::caption(format!("({count} keys)"))
-                .style(liana_ui::theme::text::secondary)
-                .into(),
-        ),
-    });
-    let trailing = row![]
-        .push_maybe(key_count)
-        .push_maybe(role_badge(role))
-        .push(status_badge(wallet, user_email))
-        .push(
-            icon::chevron_right()
-                .size(18)
-                .color(liana_ui::color::LIGHT_BORDER),
-        )
-        .spacing(10)
+    let trailing = row![status_badge(wallet, user_email), list::entry_chevron()]
+        .spacing(12)
         .align_y(Alignment::Center);
 
     let message = Some(Msg::OrgWalletSelected(wallet.id));
@@ -132,6 +113,7 @@ pub fn wallet_card<'a>(
     list::entry_wallet(
         wallet_entry_status(wallet, user_email),
         alias,
+        role_badge(role),
         last_edit_info,
         Some(trailing.into()),
         message,
@@ -172,10 +154,10 @@ pub fn wallet_select_view(state: &State) -> Element<'_, Msg> {
     );
 
     // Scrollable list content: wallet cards
-    let mut list_content = Column::new()
-        .spacing(10)
-        .align_x(Alignment::Center)
-        .padding([0, 20]);
+    let mut list_content = column![]
+        .spacing(12)
+        .width(Length::Fill)
+        .align_x(Alignment::Center);
 
     // Filter wallets by search text (case-insensitive)
     let search_filter = state.views.wallet_select.search_filter.to_lowercase();
