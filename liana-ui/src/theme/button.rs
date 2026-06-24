@@ -1,6 +1,7 @@
 use iced::widget::button::{Catalog, Status, Style, StyleFn};
 use iced::{Background, Border, Color};
 
+use super::card::CARD_RADIUS;
 use super::palette::Button;
 use super::Theme;
 
@@ -39,12 +40,35 @@ button_styles!(
     container_border,
     menu,
     transparent,
+    remove,
     transparent_border,
-    clickable_card,
     clickable_section,
     link,
     signing_devices,
 );
+
+pub fn auxiliary(theme: &Theme, status: Status) -> Style {
+    let mut style = button(&theme.colors.buttons.auxiliary, status, 0.0);
+    style.border.radius = CARD_RADIUS.into();
+    style
+}
+
+pub fn list_entry(theme: &Theme, status: Status) -> Style {
+    let mut style = button(
+        &theme.colors.buttons.list_entry,
+        status,
+        theme.button_border_width,
+    );
+    if let Some(radius) = theme.colors.buttons.list_entry_radius {
+        style.border.radius = radius.into();
+    }
+    if status == Status::Hovered {
+        if let Some(width) = theme.colors.buttons.list_entry_hover_border_width {
+            style.border.width = width;
+        }
+    }
+    style
+}
 
 pub fn tab_menu(theme: &Theme, status: Status) -> Style {
     let mut style = button(
@@ -117,7 +141,7 @@ fn round_button(p: &Button, status: Status, width: f32, radius: f32) -> Style {
 
 pub fn round_icon_btn(theme: &Theme, status: Status, radius: f32) -> Style {
     round_button(
-        &theme.colors.buttons.clickable_card,
+        &theme.colors.buttons.list_entry,
         status,
         theme.button_border_width,
         radius,

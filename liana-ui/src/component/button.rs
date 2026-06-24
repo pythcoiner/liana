@@ -9,24 +9,31 @@ use super::{
     tooltip,
 };
 use crate::{
-    font::{BOLD, MEDIUM},
+    font::{BOLD, MANROPE_SEMIBOLD, MEDIUM},
     icon::{self, ICON_SIZE_L},
     theme::{self, button::round_icon_btn, Theme},
     widget::*,
 };
 use iced::{
     alignment::{Horizontal, Vertical},
+    mouse,
     widget::{
         button::{Status, Style},
-        container, row,
+        canvas::{self, Canvas, LineDash, Path, Stroke},
+        container, row, Space,
     },
-    Length,
+    Background, Color, Length, Point, Rectangle, Size,
 };
 
 const MENU_BTN_PADDING: [u16; 2] = [4 /* Top/Bottom */, 12 /* Left/Right */];
 const MENU_TEXT_SIZE: u32 = 22;
 const MENU_TEXT_COMPACT_SIZE: u32 = 18;
 const MENU_ICON_SIZE: u32 = ICON_SIZE_L as u32;
+const AUXILIARY_PADDING: [u16; 2] = [14, 20];
+const AUXILIARY_RADIUS: f32 = 16.0;
+const AUXILIARY_BORDER_WIDTH: f32 = 1.0;
+const AUXILIARY_DASH: &[f32] = &[6.0, 6.0];
+const LIST_ENTRY_ACCENT_WIDTH: f32 = 4.0;
 
 const ICON_BTN_SIZE: f32 = 40.0;
 const ICON_BTN_PADDING: f32 = 10.0;
@@ -151,16 +158,48 @@ button_helpers!(
     link,
 );
 
+pub fn auxiliary<'a, T: 'a + Clone>(
+    icon: Option<Text<'a>>,
+    t: impl Display,
+    msg: Option<T>,
+) -> Button<'a, T> {
+    Button::new(auxiliary_content(icon, t, msg.is_some()))
+        .style(theme::button::auxiliary)
+        .on_press_maybe(msg)
+        .width(Length::Fill)
+}
+
 pub fn breadcrumb<'a, T: 'a>(icon: Option<Text<'a>>, t: &'static str) -> Button<'a, T> {
     Button::new(content(icon, panel_title(t), false)).style(theme::button::breadcrumb)
 }
-pub fn clickable_card<'a, M: 'a + Clone, T: Into<Element<'a, M>>>(
+
+pub fn list_entry<'a, M: 'a + Clone, T: Into<Element<'a, M>>>(
     content: T,
+    accent: Option<Color>,
+    width: EntryWidth,
     msg: Option<M>,
-) -> Button<'a, M> {
-    Button::new(content.into())
-        .style(theme::button::clickable_card)
+) -> Element<'a, M> {
+    let button = Button::new(content.into())
+        .style(theme::button::list_entry)
         .on_press_maybe(msg)
+        .width(Length::Fill);
+
+    let entry: Element<'a, M> = if let Some(color) = accent {
+        row![
+            container(Space::fill_height())
+                .width(LIST_ENTRY_ACCENT_WIDTH)
+                .style(move |_| container::Style {
+                    background: Some(Background::Color(color)),
+                    ..Default::default()
+                }),
+            button
+        ]
+        .into()
+    } else {
+        button.into()
+    };
+
+    container(entry).width(width).into()
 }
 
 pub fn clickable_section<'a, M: 'a + Clone, T: Into<Element<'a, M>>>(
@@ -175,6 +214,111 @@ pub fn clickable_section<'a, M: 'a + Clone, T: Into<Element<'a, M>>>(
 
 fn content<'a, T: 'a>(icon: Option<Text<'a>>, text: Text<'a>, compact: bool) -> Container<'a, T> {
     content_with_tooltip(icon, text, None, compact)
+}
+
+fn auxiliary_content<'a, T: 'a>(
+    icon: Option<Text<'a>>,
+    t: impl Display,
+    enabled: bool,
+) -> Stack<'a, T> {
+    let text = Text::new(t.to_string()).size(16).font(MANROPE_SEMIBOLD);
+    let content = match icon {
+        None => container(text),
+        Some(icon) => container(
+            row![icon.size(16), text]
+                .spacing(10)
+                .align_y(Vertical::Center),
+        ),
+    }
+    .align_x(Horizontal::Center)
+        .padding(AUXILIARY_PADDING)
+        .width(Length::Fill);
+    Stack::new().push(content).push(
+        Canvas::<AuxiliaryBorder, T, Theme, Renderer>::new(AuxiliaryBorder { enabled })
+            .width(Length::Fill)
+            .height(Length::Fill),
+    )
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AuxiliaryBorder {
+    enabled: bool,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct AuxiliaryBorderState {
+    pressed: bool,
+}
+
+impl<Message> canvas::Program<Message, Theme, Renderer> for AuxiliaryBorder {
+    type State = AuxiliaryBorderState;
+
+    fn update(
+        &self,
+        state: &mut Self::State,
+        event: &canvas::Event,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> Option<canvas::Action<Message>> {
+        if !self.enabled {
+            state.pressed = false;
+            return None;
+        }
+
+        match event {
+            canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                if cursor.is_over(bounds) =>
+            {
+                state.pressed = true;
+                Some(canvas::Action::request_redraw())
+            }
+            canvas::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                state.pressed = false;
+                Some(canvas::Action::request_redraw())
+            }
+            _ => None,
+        }
+    }
+
+    fn draw(
+        &self,
+        state: &Self::State,
+        renderer: &Renderer,
+        theme: &Theme,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> Vec<canvas::Geometry> {
+        let mut frame = canvas::Frame::new(renderer, bounds.size());
+        let inset = AUXILIARY_BORDER_WIDTH / 2.0;
+        let path = Path::rounded_rectangle(
+            Point::new(inset, inset),
+            Size::new(
+                bounds.width - AUXILIARY_BORDER_WIDTH,
+                bounds.height - AUXILIARY_BORDER_WIDTH,
+            ),
+            AUXILIARY_RADIUS.into(),
+        );
+        let status = match (self.enabled, state.pressed, cursor.is_over(bounds)) {
+            (false, _, _) => Status::Disabled,
+            (true, true, true) => Status::Pressed,
+            (true, _, true) => Status::Hovered,
+            (true, _, false) => Status::Active,
+        };
+        let style = theme::button::auxiliary(theme, status);
+        frame.stroke(
+            &path,
+            Stroke {
+                line_dash: LineDash {
+                    segments: AUXILIARY_DASH,
+                    offset: 0,
+                },
+                ..Stroke::default()
+            }
+            .with_color(style.border.color)
+            .with_width(AUXILIARY_BORDER_WIDTH),
+        );
+        vec![frame.into_geometry()]
+    }
 }
 
 fn content_with_tooltip<'a, T: 'a>(
@@ -251,6 +395,24 @@ impl From<BtnWidth> for Length {
         match value {
             BtnWidth::Auto => Length::Shrink,
             v => (v as u16 as u32).into(),
+        }
+    }
+}
+
+pub enum EntryWidth {
+    Standard,
+    Account,
+    Fill,
+    Shrink,
+}
+
+impl From<EntryWidth> for Length {
+    fn from(value: EntryWidth) -> Self {
+        match value {
+            EntryWidth::Standard => 600.into(),
+            EntryWidth::Account => 520.into(),
+            EntryWidth::Fill => Length::Fill,
+            EntryWidth::Shrink => Length::Shrink,
         }
     }
 }
@@ -501,8 +663,20 @@ pub fn btn_generate_address<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> 
     btn_primary(icon, label, BtnWidth::Auto, msg)
 }
 
+pub fn btn_add_key<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
+    auxiliary(Some(icon::plus_icon()), "Add a key", msg).width(Length::Fill)
+}
+
+pub fn btn_add_recovery_path<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
+    auxiliary(Some(icon::plus_icon()), "Add a recovery path", msg).width(Length::Fill)
+}
+
 pub fn btn_skip<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
     btn_secondary(None, "Skip", BtnWidth::XL, msg)
+}
+
+pub fn btn_skip_registration<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
+    auxiliary(None, "Skip registration", msg).width(Length::Fill)
 }
 
 pub fn btn_resend_token<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
@@ -519,7 +693,7 @@ pub fn btn_change_email<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
 }
 
 pub fn btn_connect_another_email<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
-    btn_tertiary(None, "Connect with another email", BtnWidth::XXL, msg)
+    auxiliary(None, "Connect with another email", msg).width(Length::Fill)
 }
 
 pub fn btn_verify_compact<'a, T: Clone + 'a>(msg: T) -> Button<'a, T> {
