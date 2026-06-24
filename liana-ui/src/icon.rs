@@ -7,20 +7,38 @@ pub const ICON_SIZE_M: u16 = 24;
 pub const ICON_SIZE_S: u16 = 16;
 
 const BOOTSTRAP_ICONS: Font = Font::with_name("bootstrap-icons");
+const ICONEX_ICONS: Font = Font::with_name("Untitled1");
+const LIANA_ICONS: Font = Font::with_name("liana-icons");
 
-fn bootstrap_icon<'a>(unicode: char) -> Text<'a> {
+fn font_icon<'a>(font: Font, unicode: char) -> Text<'a> {
     Text::new(unicode.to_string())
-        .font(BOOTSTRAP_ICONS)
+        .font(font)
         .width(Length::Fixed(20.0))
         .align_x(alignment::Horizontal::Center)
         .size(P1_SIZE)
 }
 
-fn bootstrap_icon_no_padding<'a>(unicode: char) -> Text<'a> {
+fn font_icon_no_padding<'a>(font: Font, unicode: char) -> Text<'a> {
     Text::new(unicode.to_string())
-        .font(BOOTSTRAP_ICONS)
+        .font(font)
         .size(P1_SIZE)
         .line_height(LineHeight::Relative(1.0))
+}
+
+fn bootstrap_icon<'a>(unicode: char) -> Text<'a> {
+    font_icon(BOOTSTRAP_ICONS, unicode)
+}
+
+fn bootstrap_icon_no_padding<'a>(unicode: char) -> Text<'a> {
+    font_icon_no_padding(BOOTSTRAP_ICONS, unicode)
+}
+
+fn iconex_icon<'a>(unicode: char) -> Text<'a> {
+    font_icon(ICONEX_ICONS, unicode)
+}
+
+fn liana_icon<'a>(unicode: char) -> Text<'a> {
+    font_icon(LIANA_ICONS, unicode)
 }
 
 pub fn cross_icon<'a>() -> Text<'a> {
@@ -101,6 +119,14 @@ pub fn minus_icon<'a>() -> Text<'a> {
 
 pub fn warning_icon() -> Text<'static> {
     bootstrap_icon('\u{F33B}')
+}
+
+pub fn shield_icon() -> Text<'static> {
+    bootstrap_icon('\u{F53F}')
+}
+
+pub fn lock_icon() -> Text<'static> {
+    bootstrap_icon('\u{F47B}')
 }
 
 pub fn warning_fill_icon() -> Text<'static> {
@@ -195,6 +221,10 @@ pub fn collection_icon() -> Text<'static> {
     bootstrap_icon('\u{F2CC}')
 }
 
+pub fn org_icon() -> Text<'static> {
+    bootstrap_icon('\u{F876}')
+}
+
 pub fn coins_icon() -> Text<'static> {
     bootstrap_icon('\u{F45B}')
 }
@@ -231,16 +261,6 @@ pub fn copy_icon<'a>() -> Text<'a> {
     bootstrap_icon_no_padding('\u{F759}')
 }
 
-const ICONEX_ICONS: Font = Font::with_name("Untitled1");
-
-fn iconex_icon<'a>(unicode: char) -> Text<'a> {
-    Text::new(unicode.to_string())
-        .font(ICONEX_ICONS)
-        .width(Length::Fixed(20.0))
-        .align_x(alignment::Horizontal::Center)
-        .size(P1_SIZE)
-}
-
 pub fn arrow_repeat() -> Text<'static> {
     iconex_icon('\u{46BB}')
 }
@@ -267,4 +287,8 @@ pub fn circle_check_icon() -> Text<'static> {
 
 pub fn circle_cross_icon() -> Text<'static> {
     iconex_icon('\u{19DA}')
+}
+
+pub fn scale_icon() -> Text<'static> {
+    liana_icon('\u{E001}')
 }
