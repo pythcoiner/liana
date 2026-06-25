@@ -409,6 +409,9 @@ pub(crate) fn entry_key_kind(key_type: &ws_business::KeyType) -> list::EntryKeyK
     }
 }
 
+/// A select list shows its filter input only when it has more than this many entries.
+pub(crate) const SEARCH_ENTRY_THRESHOLD: usize = 5;
+
 /// Optional centered search bar inside a select list view.
 pub struct SelectSearch<'a> {
     pub placeholder: &'static str,

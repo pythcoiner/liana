@@ -20,6 +20,7 @@ use uuid::Uuid;
 
 use super::{
     menu_entry, select_list_view, SelectListView, SelectSearch, INSTALLER_STEPS,
+    SEARCH_ENTRY_THRESHOLD,
 };
 
 /// Derive the user's role for a specific wallet based on wallet data and global role
@@ -193,7 +194,7 @@ pub fn org_select_view(state: &State) -> Element<'_, Msg> {
         is_ws_admin,
         breadcrumb: vec!["Organizations".to_string()],
         title: "Organizations".to_string(),
-        search: (is_ws_admin && !orgs.is_empty()).then_some(SelectSearch {
+        search: (is_ws_admin && orgs.len() > SEARCH_ENTRY_THRESHOLD).then_some(SelectSearch {
             placeholder: "Filter organizations...",
             value: &state.views.org_select.search_filter,
             on_change: Msg::OrgSelectUpdateSearchFilter,
