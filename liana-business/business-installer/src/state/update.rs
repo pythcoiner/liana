@@ -809,7 +809,7 @@ impl State {
     }
 
     fn on_template_edit_path(&mut self, is_primary: bool, path_index: Option<usize>) {
-        use views::path::TimelockUnit;
+        use views::paths::TimelockUnit;
 
         if is_primary {
             self.views.paths.edit_path_modal = Some(views::EditPathModalState {
@@ -856,7 +856,7 @@ impl State {
     }
 
     fn on_template_new_path_modal(&mut self) {
-        use views::path::TimelockUnit;
+        use views::paths::TimelockUnit;
 
         // Open modal for creating a new recovery path (all keys deselected)
         self.views.paths.edit_path_modal = Some(views::EditPathModalState {

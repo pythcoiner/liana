@@ -63,7 +63,7 @@ pub enum Msg {
     TemplateCancelPathModal,                                    // Close path modal
     TemplateUpdateThreshold(String),                            // Update threshold field
     TemplateUpdateTimelock(String),                             // Update timelock field
-    TemplateUpdateTimelockUnit(crate::state::views::path::TimelockUnit), // Update timelock unit
+    TemplateUpdateTimelockUnit(crate::state::views::paths::TimelockUnit), // Update timelock unit
     TemplateLock,                                               // Lock template (Draft → Locked)
     TemplateUnlock,                                             // Unlock template (Locked → Draft)
     TemplateValidate,                                           // Validate template

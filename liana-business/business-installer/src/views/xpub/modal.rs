@@ -51,16 +51,8 @@ pub fn xpub_modal_view(state: &State) -> Option<Element<'_, Msg>> {
 
 fn select_view<'a>(state: &'a State, modal_state: &'a XpubEntryModalState) -> Element<'a, Msg> {
     let xpub_status: Option<Element<'_, Msg>> = modal_state.current_xpub.is_some().then_some(
-        card::simple(
-            row![
-                icon::tooltip_icon().size(16),
-                text::new::caption(
-                    "This key already has an xpub. You can replace it by fetching from a device, importing from file, or pasting."
-                )
-                .style(theme::text::secondary)
-            ]
-            .spacing(10)
-            .align_y(Alignment::Start),
+        card::info(
+            "This key already has an xpub. You can replace it by fetching from a device, importing from file, or pasting."
         )
         .width(Length::Fill)
         .into(),

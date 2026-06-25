@@ -1,7 +1,15 @@
-use crate::{color, component::text::text, icon, theme, widget::*};
-use iced::{widget::button, Alignment, Padding};
+use crate::{
+    color,
+    component::text::{new, text},
+    icon, theme,
+    widget::*,
+};
+use iced::{
+    widget::{button, row},
+    Alignment, Length, Padding,
+};
 const CARD_PADDING: [u16; 2] = [15, 30];
-const SOFT_CARD_PADDING: [u16; 2] = [13, 16];
+pub(crate) const SOFT_CARD_PADDING: [u16; 2] = [13, 16];
 
 pub fn modal<'a, T: 'a, C: Into<Element<'a, T>>>(content: C) -> Container<'a, T> {
     Container::new(content)
@@ -107,7 +115,7 @@ where
 
 // Tinted soft-callout cards. Padding is the compact [13,16] for every consumer; the radius
 // branches by theme in theme::card (business 12, wallet 16).
-pub fn soft_warning<'a, T, M>(content: T) -> Element<'a, M>
+pub fn soft_warning<'a, T, M>(content: T) -> Container<'a, M>
 where
     T: Into<Element<'a, M>>,
     M: Clone + 'a,
@@ -115,21 +123,23 @@ where
     Container::new(content)
         .padding(SOFT_CARD_PADDING)
         .style(theme::card::soft_warning)
-        .into()
 }
 
-pub fn info<'a, T, M>(content: T) -> Element<'a, M>
-where
-    T: Into<Element<'a, M>>,
-    M: Clone + 'a,
-{
-    Container::new(content)
-        .padding(SOFT_CARD_PADDING)
-        .style(theme::card::info)
-        .into()
+pub fn info<'a, M: 'a>(body: impl std::fmt::Display + 'a) -> Container<'a, M> {
+    Container::new(
+        row![
+            icon::tooltip_icon().size(16).style(theme::text::secondary),
+            new::caption(body).style(theme::text::secondary),
+        ]
+        .spacing(10)
+        .align_y(Alignment::Center),
+    )
+    .width(Length::Fill)
+    .padding(SOFT_CARD_PADDING)
+    .style(theme::card::info)
 }
 
-pub fn success<'a, T, M>(content: T) -> Element<'a, M>
+pub fn success<'a, T, M>(content: T) -> Container<'a, M>
 where
     T: Into<Element<'a, M>>,
     M: Clone + 'a,
@@ -137,5 +147,4 @@ where
     Container::new(content)
         .padding(SOFT_CARD_PADDING)
         .style(theme::card::success)
-        .into()
 }

@@ -11,7 +11,7 @@ use iced::{
 use liana_connect::ws_business::{self, KeyIdentity, KeyType, UserRole, WalletStatus};
 use liana_ui::{
     component::{
-        button::{btn_add_key, btn_edit_keys, btn_mark_keys_ready, EntryWidth},
+        button::{self, btn_add_key, btn_edit_keys, btn_mark_keys_ready, EntryWidth},
         card, pill,
         text::{self},
     },
@@ -21,7 +21,7 @@ use liana_ui::{
 
 use super::{
     key_kind_label, layout_with_scrollable_list, menu_key_entry,
-    wallet_edit::wallet_edit_tab_header,
+    wallet_edit::wallet_edit_tab_header, INSTALLER_STEPS,
 };
 
 fn compact_kind_pill(key_type: &KeyType) -> Element<'static, Msg> {
@@ -63,7 +63,7 @@ fn key_signer(key: &ws_business::Key) -> String {
 const NOTICE_ICON_SIZE: u32 = 16;
 
 fn notice_card(
-    variant: fn(Element<'static, Msg>) -> Element<'static, Msg>,
+    variant: fn(Element<'static, Msg>) -> Container<'static, Msg>,
     icon: Text<'static>,
     body: &'static str,
 ) -> Element<'static, Msg> {
@@ -74,7 +74,7 @@ fn notice_card(
     .spacing(11)
     .align_y(Alignment::Center);
 
-    variant(content.into())
+    variant(content.into()).width(Length::Fill).into()
 }
 
 fn notice_content(is_manager: bool, keys_ready: bool, locked: bool) -> Element<'static, Msg> {
@@ -90,10 +90,8 @@ fn notice_content(is_manager: bool, keys_ready: bool, locked: bool) -> Element<'
                 },
             )]
         } else {
-            column![notice_card(
-                card::info,
-                icon::tooltip_icon().style(theme::text::secondary),
-                "List the keys that will be part of this wallet and assign a signer to each. The spending policy will be crafted from these keys.",
+            column![card::info(
+                "List the keys that will be part of this wallet and assign a signer to each. The spending policy will be crafted from these keys."
             )]
         }
     } else if keys_ready {
@@ -103,10 +101,8 @@ fn notice_content(is_manager: bool, keys_ready: bool, locked: bool) -> Element<'
                 icon::check_icon().style(theme::text::success),
                 "Marked as ready by the Wallet Manager. They've finished adding keys & signers.",
             ),
-            notice_card(
-                card::info,
-                icon::tooltip_icon().style(theme::text::secondary),
-                "These keys are shared with the Spending policy tab, where you arrange them into spending paths.",
+            card::info(
+                "These keys are shared with the Spending policy tab, where you arrange them into spending paths."
             ),
         ]
     } else {
@@ -117,7 +113,7 @@ fn notice_content(is_manager: bool, keys_ready: bool, locked: bool) -> Element<'
         )]
     };
 
-    cards.spacing(12).into()
+    cards.spacing(12).width(Length::Fill).into()
 }
 
 fn keys_list(state: &State, editable: bool) -> Element<'static, Msg> {
@@ -222,6 +218,8 @@ pub fn keys_view(state: &State) -> Element<'_, Msg> {
         wallet_edit_tab_header(state),
         notice_content(is_manager, state.app.keys_ready, locked),
     ]
+    .width(button::STANDARD_ENTRY_WIDTH)
+    .align_x(Alignment::Center)
     .into();
     let keys_list = keys_list(state, editable);
     let add_key = editable.then_some(
@@ -257,7 +255,7 @@ pub fn keys_view(state: &State) -> Element<'_, Msg> {
     let breadcrumb = vec![org_name, wallet_name];
 
     layout_with_scrollable_list(
-        (0, 0),
+        (5, INSTALLER_STEPS),
         Some(current_user_email),
         is_ws_admin,
         &breadcrumb,
