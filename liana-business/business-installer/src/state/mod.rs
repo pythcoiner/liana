@@ -9,7 +9,7 @@ use crate::{
 };
 use async_hwi::{bitbox::NoiseConfig, service::HwiService};
 use crossbeam::channel;
-use liana_connect::ws_business::{PolicyTemplate, Wallet};
+use liana_connect::ws_business::Wallet;
 use liana_gui::{app::settings::global::PersistedBitboxNoiseConfig, dir::LianaDirectory};
 use liana_ui::widget::{modal::Modal, Element};
 pub use message::{HardwareWalletRequestId, Message, Msg};
@@ -218,13 +218,7 @@ impl State {
 
     /// Check if the template is valid and ready for validation
     pub fn is_template_valid(&self) -> bool {
-        let template = PolicyTemplate {
-            keys: self.app.keys.clone(),
-            primary_path: self.app.primary_path.clone(),
-            secondary_paths: self.app.secondary_paths.clone(),
-            keys_ready: self.app.keys_ready,
-        };
-        template.is_valid()
+        self.app.template().is_valid()
     }
 
     pub fn selected_wallet(&self) -> Option<Wallet> {
