@@ -585,54 +585,56 @@ fn refresh(mut state: State) -> impl Stream<Item = HardwareWalletMessage> {
                         still.push(id);
                         continue;
                     }
-                    if let Some(sn) = device_info.serial_number() {
-                        if let Ok((cc, _)) =
-                            coldcard::api::Coldcard::open(AsRefWrap { inner: api }, sn, None)
+                    // BUG: hidapi seems have a bug with Coldcard MK5 on apple, returning None as
+                    // serial, we fallback to mk5_hid_bug as serial, thus it became not possible
+                    // to use 2 mk5 connected simultaneously.
+                    let sn = device_info.serial_number().unwrap_or("mk5_hid_bug");
+                    if let Ok((cc, _)) =
+                        coldcard::api::Coldcard::open(AsRefWrap { inner: api }, sn, None)
+                    {
+                        let device: Arc<dyn HWI + Send + Sync> = if let Some(wallet) = &state.wallet
                         {
-                            let device: Arc<dyn HWI + Send + Sync> =
-                                if let Some(wallet) = &state.wallet {
-                                    coldcard::Coldcard::from(cc)
-                                        .with_wallet_name(wallet.name.clone())
-                                        .into()
+                            coldcard::Coldcard::from(cc)
+                                .with_wallet_name(wallet.name.clone())
+                                .into()
+                        } else {
+                            coldcard::Coldcard::from(cc).into()
+                        };
+                        match (
+                            device.get_master_fingerprint().await,
+                            device.get_version().await,
+                        ) {
+                            (Ok(fingerprint), Ok(version)) => {
+                                if version
+                                    >= (Version {
+                                        major: 6,
+                                        minor: 2,
+                                        patch: 1,
+                                        prerelease: None,
+                                    })
+                                {
+                                    hws.push(HardwareWallet::Supported {
+                                        id,
+                                        device,
+                                        kind: DeviceKind::Coldcard,
+                                        fingerprint,
+                                        version: Some(version),
+                                        registered: None,
+                                        alias: state.keys_aliases.get(&fingerprint).cloned(),
+                                    });
                                 } else {
-                                    coldcard::Coldcard::from(cc).into()
-                                };
-                            match (
-                                device.get_master_fingerprint().await,
-                                device.get_version().await,
-                            ) {
-                                (Ok(fingerprint), Ok(version)) => {
-                                    if version
-                                        >= (Version {
-                                            major: 6,
-                                            minor: 2,
-                                            patch: 1,
-                                            prerelease: None,
-                                        })
-                                    {
-                                        hws.push(HardwareWallet::Supported {
-                                            id,
-                                            device,
-                                            kind: DeviceKind::Coldcard,
-                                            fingerprint,
-                                            version: Some(version),
-                                            registered: None,
-                                            alias: state.keys_aliases.get(&fingerprint).cloned(),
-                                        });
-                                    } else {
-                                        hws.push(HardwareWallet::Unsupported {
-                                            id,
-                                            kind: device.device_kind(),
-                                            version: Some(version),
-                                            reason: UnsupportedReason::Version {
-                                                minimal_supported_version: "Edge firmware v6.2.1"
-                                                    .to_string(),
-                                            },
-                                        });
-                                    }
+                                    hws.push(HardwareWallet::Unsupported {
+                                        id,
+                                        kind: device.device_kind(),
+                                        version: Some(version),
+                                        reason: UnsupportedReason::Version {
+                                            minimal_supported_version: "Edge firmware v6.2.1"
+                                                .to_string(),
+                                        },
+                                    });
                                 }
-                                _ => tracing::error!("Failed to connect to coldcard"),
                             }
+                            _ => tracing::error!("Failed to connect to coldcard"),
                         }
                     }
                 }
