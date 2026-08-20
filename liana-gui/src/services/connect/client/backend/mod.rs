@@ -16,7 +16,10 @@ use liana::{
 };
 use lianad::{
     bip329::Labels,
-    commands::{CoinStatus, GetInfoDescriptors, LCSpendInfo, LabelItem, UpdateDerivIndexesResult},
+    commands::{
+        CoinStatus, CreateRecoveryWarning, GetInfoDescriptors, LCSpendInfo, LabelItem,
+        UpdateDerivIndexesResult,
+    },
     config::Config,
 };
 use reqwest::{Error, IntoUrl, Method, RequestBuilder};
@@ -936,7 +939,7 @@ impl Daemon for BackendWalletClient {
         coins_outpoints: &[OutPoint],
         feerate_vb: u64,
         sequence: Option<u16>,
-    ) -> Result<Psbt, DaemonError> {
+    ) -> Result<(Psbt, Vec<CreateRecoveryWarning>), DaemonError> {
         let timelock = sequence.ok_or(DaemonError::Unexpected("Missing sequence".to_string()))?;
         let res: api::DraftPsbt = self
             .inner
@@ -955,7 +958,8 @@ impl Daemon for BackendWalletClient {
             )
             .await?;
 
-        Ok(res.raw)
+        // the connect API does not know `CreateRecoveryWarning` and gives warnings as raw text.
+        Ok((res.raw, vec![]))
     }
 
     async fn get_labels(
