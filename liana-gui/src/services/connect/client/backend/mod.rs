@@ -958,8 +958,14 @@ impl Daemon for BackendWalletClient {
             )
             .await?;
 
+        let warnings = res
+            .warnings
+            .into_iter()
+            .map(CreateRecoveryWarning::String)
+            .collect();
+
         // the connect API does not know `CreateRecoveryWarning` and gives warnings as raw text.
-        Ok((res.raw, vec![]))
+        Ok((res.raw, warnings))
     }
 
     async fn get_labels(

@@ -1544,6 +1544,7 @@ pub struct CreateRecoveryResult {
 pub enum CreateRecoveryWarning {
     /// A warning if the sweep address is known to belong to user's wallet.
     ToOwnAddress,
+    String(String),
 }
 
 impl fmt::Display for CreateRecoveryWarning {
@@ -1555,6 +1556,9 @@ impl fmt::Display for CreateRecoveryWarning {
                 longer spend with the primary path, use an address from a \
                 different wallet instead."
             ),
+            CreateRecoveryWarning::String(str) => {
+                write!(f, "{str}")
+            }
         }
     }
 }
