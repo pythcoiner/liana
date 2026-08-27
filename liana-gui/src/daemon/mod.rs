@@ -17,7 +17,7 @@ use liana::miniscript::bitcoin::{
     secp256k1, Address, Network, OutPoint, Txid,
 };
 use lianad::bip329::Labels;
-use lianad::commands::UpdateDerivIndexesResult;
+use lianad::commands::{CreateRecoveryWarning, UpdateDerivIndexesResult};
 use lianad::{
     commands::{CoinStatus, LabelItem, TransactionInfo},
     config::Config,
@@ -182,7 +182,7 @@ pub trait Daemon: Debug {
         coins_outpoints: &[OutPoint],
         feerate_vb: u64,
         sequence: Option<u16>,
-    ) -> Result<Psbt, DaemonError>;
+    ) -> Result<(Psbt, Vec<CreateRecoveryWarning>), DaemonError>;
     async fn list_txs(&self, txid: &[Txid]) -> Result<model::ListTransactionsResult, DaemonError>;
     async fn get_labels(
         &self,

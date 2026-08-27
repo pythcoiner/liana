@@ -11,7 +11,7 @@ use liana::{
 };
 
 use liana_ui::{
-    component::{amount::*, button, form, panels::spend, text::new},
+    component::{amount::*, button, form, label::LABEL_LENGTH_WARNING, panels::spend, text::new},
     icon, theme,
     widget::*,
 };
@@ -54,7 +54,7 @@ pub fn spend_view<'a>(
     }))
     .width(Length::Fill);
 
-    let warnings = (!(spend_warnings.is_empty() || saved)).then(|| {
+    let warnings = (!(spend_warnings.is_empty() || saved)).then_some({
         let rows = spend_warnings.iter().map(|warning| {
             let warn_icon = icon::warning_icon().style(theme::text::warning);
             let warn_text = new::caption(warning).style(theme::text::warning);
@@ -85,8 +85,8 @@ pub fn spend_view<'a>(
         row![delete].width(Length::Fill)
     } else {
         let previous = button::btn_previous((!currently_signing).then_some(Message::Previous));
-        let save =
-            button::btn_save((!currently_signing).then_some(Message::Spend(SpendTxMessage::Save)));
+        let save_msg = (!currently_signing).then_some(Message::Spend(SpendTxMessage::Save));
+        let save = button::btn_save(save_msg, false);
         row![previous, Space::fill_width(), save].width(Length::Fill)
     };
 
@@ -155,7 +155,7 @@ pub fn create_spend_tx<'a>(
         form::Form::new("Batch label", batch_label, |s| {
             Message::CreateSpend(CreateSpendMessage::BatchLabelEdited(s))
         })
-        .warning("Invalid label length, cannot be superior to 100")
+        .warning(LABEL_LENGTH_WARNING)
         .size(30)
         .padding(10),
     );
@@ -319,7 +319,9 @@ fn next_disabled_reason(
     } else if recipients.iter().any(|r| empty_or_invalid(&r.label))
         || (recipients.len() >= 2 && !batch_label.valid)
     {
-        Some(NextBlocker::Reason("A label is missing or invalid"))
+        Some(NextBlocker::Reason(
+            "Payment description is missing or invalid",
+        ))
     } else if recipients.iter().any(|r| empty_or_invalid(&r.amount)) {
         Some(NextBlocker::Reason(if max_under_dust {
             "Select or add more funds"

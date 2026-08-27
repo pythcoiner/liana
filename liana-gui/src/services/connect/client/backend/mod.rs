@@ -16,7 +16,10 @@ use liana::{
 };
 use lianad::{
     bip329::Labels,
-    commands::{CoinStatus, GetInfoDescriptors, LCSpendInfo, LabelItem, UpdateDerivIndexesResult},
+    commands::{
+        CoinStatus, CreateRecoveryWarning, GetInfoDescriptors, LCSpendInfo, LabelItem,
+        UpdateDerivIndexesResult,
+    },
     config::Config,
 };
 use reqwest::{Error, IntoUrl, Method, RequestBuilder};
@@ -77,6 +80,10 @@ pub struct BackendClient {
     unauthenticated: Arc<AtomicBool>,
 
     user_id: String,
+    /// Email as reported by `/v1/me` — the authoritative server-side value,
+    /// which can differ from `auth_client.email` (the email the user typed
+    /// or that we read out of local settings) after a server-side change.
+    user_email: String,
 }
 
 impl BackendClient {
@@ -100,14 +107,14 @@ impl BackendClient {
             return Err(DaemonError::NoAnswer);
         }
         let res: api::Claims = response.json().await?;
-        let user_id = res.sub;
 
         Ok(Self {
             auth: Arc::new(RwLock::new(credentials)),
             auth_client,
             network,
             url,
-            user_id,
+            user_id: res.sub,
+            user_email: res.email,
             http,
             unauthenticated: Arc::new(AtomicBool::new(false)),
         })
@@ -118,7 +125,11 @@ impl BackendClient {
     }
 
     pub fn user_email(&self) -> &str {
-        &self.auth_client.email
+        &self.user_email
+    }
+
+    pub fn user_id(&self) -> &str {
+        &self.user_id
     }
 
     pub async fn connect_first(self) -> Result<(BackendWalletClient, api::Wallet), DaemonError> {
@@ -569,6 +580,7 @@ impl Daemon for BackendWalletClient {
                         &old,
                         &self.inner.auth_client,
                         true, // refresh the token
+                        Some(self.inner.user_id()),
                     )
                     .await
                     .map_err(|e| {
@@ -927,7 +939,7 @@ impl Daemon for BackendWalletClient {
         coins_outpoints: &[OutPoint],
         feerate_vb: u64,
         sequence: Option<u16>,
-    ) -> Result<Psbt, DaemonError> {
+    ) -> Result<(Psbt, Vec<CreateRecoveryWarning>), DaemonError> {
         let timelock = sequence.ok_or(DaemonError::Unexpected("Missing sequence".to_string()))?;
         let res: api::DraftPsbt = self
             .inner
@@ -946,7 +958,14 @@ impl Daemon for BackendWalletClient {
             )
             .await?;
 
-        Ok(res.raw)
+        let warnings = res
+            .warnings
+            .into_iter()
+            .map(CreateRecoveryWarning::String)
+            .collect();
+
+        // the connect API does not know `CreateRecoveryWarning` and gives warnings as raw text.
+        Ok((res.raw, warnings))
     }
 
     async fn get_labels(

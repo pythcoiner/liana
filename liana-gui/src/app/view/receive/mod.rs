@@ -6,7 +6,10 @@ pub use modals::{
 
 use std::collections::HashMap;
 
-use iced::{widget::row, Alignment, Length};
+use iced::{
+    widget::{column, row},
+    Alignment, Length,
+};
 
 use liana::miniscript::bitcoin;
 
@@ -62,7 +65,7 @@ pub fn receive<'a>(
     ));
 
     // prev addresses are already ordered in descending order
-    let cards = show_prev_addresses.then(|| {
+    let cards = show_prev_addresses.then_some({
         prev_addresses.iter().enumerate().fold(
             Column::new().spacing(14).width(Length::Fill),
             |col, (i, address)| col.push(address_card(i, address, prev_labels, labels_editing)),
@@ -70,14 +73,9 @@ pub fn receive<'a>(
     });
 
     let see_more =
-        (!is_last_page && show_prev_addresses).then(|| list::see_more(processing, Message::Next));
+        (!is_last_page && show_prev_addresses).then_some(list::see_more(processing, Message::Next));
 
-    Column::new()
-        .push(header)
-        .push(description)
-        .push_maybe(prev_header)
-        .push_maybe(cards)
-        .push_maybe(see_more)
-        .spacing(20)
-        .into()
+    let top = column![header, description].spacing(20);
+    let body = column![prev_header, cards, see_more].spacing(20);
+    column![top, body].spacing(60).into()
 }

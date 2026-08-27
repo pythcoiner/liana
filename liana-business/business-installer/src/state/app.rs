@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use liana_connect::ws_business::{Key, PolicyTemplate, SecondaryPath, SpendingPath, UserRole};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,10 +7,13 @@ use uuid::Uuid;
 /// Core application data
 #[derive(Debug, Clone)]
 pub struct AppState {
-    pub keys: BTreeMap<u8, Key>,
-    pub primary_path: SpendingPath,
-    pub secondary_paths: Vec<SecondaryPath>,
-    pub next_key_id: u8,
+    // Server-owned template fields. Private on purpose: the only writer is `apply_server_template`,
+    // fed by the backend loads. Handlers read through the accessors and send edits via edit_wallet.
+    keys: BTreeMap<u8, Key>,
+    primary_path: SpendingPath,
+    secondary_paths: Vec<SecondaryPath>,
+    keys_ready: bool,
+    next_key_id: u8,
     // Backend-related state
     pub selected_org: Option<Uuid>,
     pub selected_wallet: Option<Uuid>,
@@ -24,13 +28,54 @@ pub struct AppState {
     pub exit: bool,
     /// Server time offset in seconds (server_time - client_time)
     pub server_time_offset: i64,
+    pub escape_pressed_count: u8,
 }
 
 impl AppState {
-    /// Sort secondary paths by timelock (ascending order)
-    pub fn sort_secondary_paths(&mut self) {
-        self.secondary_paths
-            .sort_by(|a, b| a.timelock.blocks.cmp(&b.timelock.blocks));
+    pub fn keys(&self) -> &BTreeMap<u8, Key> {
+        &self.keys
+    }
+
+    pub fn primary_path(&self) -> &SpendingPath {
+        &self.primary_path
+    }
+
+    pub fn secondary_paths(&self) -> &[SecondaryPath] {
+        &self.secondary_paths
+    }
+
+    pub fn keys_ready(&self) -> bool {
+        self.keys_ready
+    }
+
+    pub fn next_key_id(&self) -> u8 {
+        self.next_key_id
+    }
+
+    /// Snapshot of the server-owned template fields, to build an edit that is sent to the backend.
+    pub fn template(&self) -> PolicyTemplate {
+        PolicyTemplate {
+            keys: self.keys.clone(),
+            primary_path: self.primary_path.clone(),
+            secondary_paths: self.secondary_paths.clone(),
+            keys_ready: self.keys_ready,
+        }
+    }
+
+    /// The only way to write the server-owned template fields: apply a template that came from the
+    /// backend. Handlers must never set these directly; send edit_wallet and let the echo land here.
+    pub fn apply_server_template(&mut self, template: PolicyTemplate) {
+        self.next_key_id = template
+            .keys
+            .keys()
+            .copied()
+            .max()
+            .map(|id| id.wrapping_add(1))
+            .unwrap_or(0);
+        self.keys = template.keys;
+        self.primary_path = template.primary_path;
+        self.secondary_paths = template.secondary_paths;
+        self.keys_ready = template.keys_ready;
     }
 
     /// Get current time in seconds, adjusted for server time offset
@@ -96,6 +141,17 @@ impl AppState {
         }
     }
 
+    /// Format a server timestamp as an absolute local date and time (e.g. "Jul 2, 2026 at 14:30").
+    pub fn format_absolute_time(&self, server_timestamp: u64) -> String {
+        DateTime::from_timestamp(server_timestamp as i64, 0)
+            .map(|dt| {
+                dt.with_timezone(&Local)
+                    .format("%b %-d, %Y at %H:%M")
+                    .to_string()
+            })
+            .unwrap_or_default()
+    }
+
     /// Empty initial state. Debug overlays seed test data via the
     /// `seed_test_data` helper in `crate::debug`.
     pub fn new() -> Self {
@@ -103,6 +159,7 @@ impl AppState {
             keys: BTreeMap::new(),
             primary_path: SpendingPath::new(true, 0, Vec::new()),
             secondary_paths: Vec::new(),
+            keys_ready: false,
             next_key_id: 0,
             selected_org: None,
             selected_wallet: None,
@@ -112,6 +169,7 @@ impl AppState {
             reconnecting: false,
             exit: false,
             server_time_offset: 0,
+            escape_pressed_count: 0,
         }
     }
 }
@@ -128,6 +186,7 @@ impl From<AppState> for PolicyTemplate {
             keys: app_state.keys,
             primary_path: app_state.primary_path,
             secondary_paths: app_state.secondary_paths,
+            keys_ready: app_state.keys_ready,
         }
     }
 }
@@ -146,6 +205,7 @@ impl From<PolicyTemplate> for AppState {
             keys: template.keys,
             primary_path: template.primary_path,
             secondary_paths: template.secondary_paths,
+            keys_ready: template.keys_ready,
             next_key_id,
             selected_org: None,
             selected_wallet: None,
@@ -155,6 +215,7 @@ impl From<PolicyTemplate> for AppState {
             reconnecting: false,
             exit: false,
             server_time_offset: 0,
+            escape_pressed_count: 0,
         }
     }
 }

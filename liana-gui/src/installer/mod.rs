@@ -14,10 +14,7 @@ use liana::{
     descriptors::{LianaDescriptor, LianaPolicy},
     miniscript::bitcoin::{self, Network},
 };
-use liana_ui::{
-    component::network_banner,
-    widget::{Column, Element},
-};
+use liana_ui::widget::Element;
 use lianad::config::{BitcoinBackend, BitcoindConfig, BitcoindRpcAuth, Config};
 use std::{collections::HashMap, fmt::Debug, ops::Deref};
 use tokio::runtime::Handle;
@@ -86,6 +83,9 @@ pub enum NextState {
         network: Network,
         /// The Connect wallet ID (UUID)
         wallet_id: String,
+        /// Stable Liana-Connect user identifier (JWT `sub`). `None` for legacy
+        /// installer paths; cache lookup falls back to email and backfills.
+        user_id: Option<String>,
         /// User's email for token lookup and re-auth
         email: String,
     },
@@ -403,21 +403,15 @@ impl LianaInstaller {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let content = self
-            .steps
+        self.steps
             .get(self.current)
             .expect("There is always a step")
             .view(
                 &self.hws,
                 self.progress(),
+                self.network,
                 self.context.remote_backend.user_email(),
-            );
-
-        if self.network != Network::Bitcoin {
-            Column::with_children(vec![network_banner(self.network).into(), content]).into()
-        } else {
-            content
-        }
+            )
     }
 }
 
@@ -818,6 +812,7 @@ pub async fn create_remote_wallet(
         keys: Vec::new(),
         hardware_wallets: Vec::new(),
         remote_backend_auth: Some(AuthConfig::new(
+            remote_backend.user_id().to_string(),
             remote_backend.user_email().to_string(),
             remote_backend.wallet_id(),
         )),
@@ -839,6 +834,7 @@ pub async fn create_remote_wallet(
         backend.auth.read().await.deref(),
         backend.auth_client(),
         false,
+        Some(remote_backend.user_id()),
     )
     .await
     {
@@ -898,6 +894,7 @@ pub async fn import_remote_wallet(
         keys: Vec::new(),
         hardware_wallets: Vec::new(),
         remote_backend_auth: Some(AuthConfig::new(
+            backend.user_id().to_string(),
             backend.user_email().to_string(),
             backend.wallet_id(),
         )),
@@ -934,6 +931,7 @@ pub async fn import_remote_wallet(
         backend.auth.read().await.deref(),
         backend.auth_client(),
         false,
+        Some(backend.user_id()),
     )
     .await
     {

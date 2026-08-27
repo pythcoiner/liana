@@ -2,8 +2,11 @@ use iced::{advanced::text::Shaping, widget::row, Alignment};
 
 use liana_ui::{
     color,
-    component::{button, form},
-    icon,
+    component::{
+        button::{self, btn_add_label, btn_edit},
+        form,
+        label::LABEL_LENGTH_WARNING,
+    },
     widget::*,
 };
 
@@ -21,12 +24,10 @@ pub fn label_editable(
                     iced::widget::Text::new(label)
                         .size(size)
                         .shaping(Shaping::Advanced),
-                    button::secondary(Some(icon::pencil_icon()), "Edit").on_press(
-                        view::Message::Label(
-                            labelled,
-                            view::message::LabelMessage::Edited(label.to_string())
-                        )
-                    )
+                    btn_edit(Some(view::Message::Label(
+                        labelled,
+                        view::message::LabelMessage::Edited(label.to_string())
+                    )))
                 )
                 .spacing(5)
                 .align_y(Alignment::Center),
@@ -34,13 +35,11 @@ pub fn label_editable(
             .into();
         }
     }
-    Container::new(
-        button::secondary(Some(icon::pencil_icon()), "Add label").on_press(view::Message::Label(
-            labelled,
-            view::message::LabelMessage::Edited(String::default()),
-        )),
-    )
-    .into()
+    let add_label_msg = Some(view::Message::Label(
+        labelled,
+        view::message::LabelMessage::Edited(String::default()),
+    ));
+    btn_add_label(add_label_msg).into()
 }
 
 pub fn label_editing(
@@ -51,7 +50,7 @@ pub fn label_editing(
     let e: Element<view::LabelMessage> = Container::new(
         row!(
             form::Form::new("Label", label, view::LabelMessage::Edited)
-                .warning("Invalid label length, cannot be superior to 100")
+                .warning(LABEL_LENGTH_WARNING)
                 .size(size)
                 .padding(10),
             if label.valid {

@@ -4,22 +4,25 @@ use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
         button::{Status, Style},
-        column, row,
-        tooltip::Position,
-        Space,
+        column, row, Space,
     },
     Length, Padding,
 };
 
 use iced::widget::Container;
 
-use bitcoin::bip32::{ChildNumber, Fingerprint};
+use bitcoin::{
+    bip32::{ChildNumber, Fingerprint},
+    Network,
+};
 
 use crate::{
     color,
     component::{
-        badge, button,
+        badge::{self, Tile},
+        button,
         form::{self, Value},
+        list::{self, DeviceStatus},
         pick_list,
         text::new::{b1_bold, b4_medium, b5_bold, b5_medium, caption},
         tooltip,
@@ -28,13 +31,18 @@ use crate::{
     theme::{self, Theme},
 };
 
-use crate::widget::{Button, CheckBox, Column, Element, SpaceExt, Text};
+use crate::{
+    spacing::{HSpacing, VSpacing},
+    widget::{Button, CheckBox, Column, Element, PickList, SpaceExt},
+};
 
 pub const BTN_W: u32 = 500;
-pub const V_SPACING: u32 = 10;
-pub const H_SPACING: u32 = 5;
+pub const V_SPACING: VSpacing = VSpacing::S;
+pub const H_SPACING: HSpacing = HSpacing::S;
 const MODAL_PADDING: f32 = 20.0;
-const MODAL_SPACING: u32 = 15;
+const MODAL_SPACING: VSpacing = VSpacing::M;
+const TOKEN_PLACEHOLDER: &str = "aaaa-bbbb-cccc";
+const MNEMONIC_PLACEHOLDER: &str = "code code code code code code code code code code code brave";
 
 /// Modal width presets.
 #[derive(Debug, Clone, Copy)]
@@ -116,15 +124,9 @@ pub fn header<'a, M: 'a + Clone>(
     back_message: Option<M>,
     close_message: Option<M>,
 ) -> Element<'a, M> {
-    let back = back_message
-        .map(|m| button::transparent(Some(icon::arrow_back().size(25)), "").on_press(m));
+    let back = back_message.map(button::btn_modal_previous);
     let title = label.map(b1_bold);
-    let close = close_message.map(|m| {
-        Button::new(icon::cross_icon().size(40))
-            .padding(0)
-            .style(theme::button::transparent)
-            .on_press(m)
-    });
+    let close = close_message.map(|m| button::btn_modal_close(Some(m)));
     row![back, title, Space::with_width(Length::Fill), close]
         .align_y(Vertical::Center)
         .into()
@@ -153,14 +155,11 @@ where
         .align_y(Vertical::Center)
         .spacing(H_SPACING);
 
-    Button::new(row)
-        .style(theme::button::transparent_border)
-        .on_press(msg)
-        .into()
+    button::btn_optional_section(row, msg).into()
 }
 
-/// Outer shell for a collapsible key/signer entry, routed through the
-/// `button::device*` helpers.
+/// Outer shell for a collapsible key/signer entry, routed through selectable
+/// list entries.
 pub fn collapsible_button<'a, Message, Closed, Expanded, Collapse>(
     collapsed: bool,
     closed_content: Closed,
@@ -174,16 +173,28 @@ where
     Message: Clone + 'static,
 {
     if collapsed {
-        button::device_with_height_clickable(expanded_content, None, None, false)
+        button::list_entry_with_state(
+            expanded_content,
+            None,
+            button::EntryWidth::Fill,
+            true,
+            false,
+            None,
+        )
     } else {
-        button::device(closed_content, Some(collapse_message()))
+        button::list_entry(
+            closed_content,
+            None,
+            button::EntryWidth::Fill,
+            Some(collapse_message()),
+        )
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn collapsible_input_button<'a, Message, Paste, Collapse, Input>(
+fn collapsible_input_button<'a, Message, Paste, Collapse, Input>(
     collapsed: bool,
-    icon: Option<Text<'static>>,
+    tile: Tile,
     label: String,
     input_placeholder: String,
     input_value: &Value<String>,
@@ -203,29 +214,34 @@ where
         form::Form::new_disabled(&input_placeholder, input_value)
     }
     .padding(10);
-    let paste = paste_message.map(|m| Button::new(icon::paste_icon()).on_press(m()));
+    let paste = paste_message.map(|m| button::btn_paste_icon(Some(m())));
 
     if collapsed {
-        let icon = icon.map(|i| i.style(theme::text::primary));
         let line = row![form, paste].spacing(H_SPACING);
         let col = column![
             row![
                 caption(label).style(theme::text::primary),
-                Space::with_width(Length::Fill)
+                Space::fill_width()
             ],
             line
         ]
         .width(Length::Fill);
-        let content = row![icon, col]
+        let content = row![badge::tile(tile), col]
             .align_y(Vertical::Center)
-            .spacing(H_SPACING)
+            .spacing(list::ENTRY_H_SPACING)
             .width(Length::Fill);
-        button::device_with_height_clickable(content, None, None, false)
+        button::list_entry_with_state(content, None, button::EntryWidth::Fill, true, false, None)
     } else {
-        let content = row![icon, caption(label)]
-            .spacing(H_SPACING)
-            .align_y(Vertical::Center);
-        button::device(content, Some(collapse_message()))
+        let content = row![badge::tile(tile), caption(label)]
+            .spacing(list::ENTRY_H_SPACING)
+            .align_y(Vertical::Center)
+            .width(Length::Fill);
+        button::list_entry(
+            content,
+            None,
+            button::EntryWidth::Fill,
+            Some(collapse_message()),
+        )
     }
 }
 
@@ -233,10 +249,10 @@ where
 /// disclaimer checkbox: the expanded button shows the checkbox first
 /// (`!ack`), then swaps to the form once the user toggles it on (`ack`).
 #[allow(clippy::too_many_arguments)]
-pub fn acked_input_button<'a, Message, Ack, Input, Paste, Collapse, I>(
+fn acked_input_button<'a, Message, Ack, Input, Paste, Collapse>(
     collapsed: bool,
     ack: bool,
-    icon: I,
+    tile: Tile,
     label: &'a str,
     disclaimer: &'a str,
     input_placeholder: &'a str,
@@ -247,7 +263,6 @@ pub fn acked_input_button<'a, Message, Ack, Input, Paste, Collapse, I>(
     collapse_message: Collapse,
 ) -> Element<'a, Message>
 where
-    I: Fn() -> Text<'static>,
     Ack: 'static + Fn(bool) -> Message,
     Input: 'static + Fn(String) -> Message,
     Paste: 'static + Fn() -> Message,
@@ -271,18 +286,38 @@ where
         } else {
             Container::new(check_box)
         };
-        row![icon(), content]
+        row![badge::tile(tile), content]
             .align_y(Vertical::Center)
-            .spacing(H_SPACING)
+            .spacing(list::ENTRY_H_SPACING)
     };
-    let closed = row![icon(), caption(label)]
-        .spacing(H_SPACING)
+    let closed = row![badge::tile(tile), caption(label)]
+        .spacing(list::ENTRY_H_SPACING)
         .align_y(Vertical::Center);
     collapsible_button(collapsed, closed, expanded, collapse_message)
 }
 
+/// Where the key behind a select-key-source row comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeySourceKind {
+    Device,
+    HotKey,
+    Xpub,
+    Token,
+}
+
+impl From<KeySourceKind> for Tile {
+    fn from(kind: KeySourceKind) -> Self {
+        match kind {
+            KeySourceKind::Device => Tile::Device,
+            KeySourceKind::HotKey => Tile::KeyHot,
+            KeySourceKind::Xpub => Tile::KeyExternal,
+            KeySourceKind::Token => Tile::KeyService,
+        }
+    }
+}
+
 pub fn key_entry<'a, M: 'a + Clone>(
-    icon: Option<Text<'a>>,
+    kind: KeySourceKind,
     name: String,
     fingerprint: Option<String>,
     tooltip_str: Option<&'a str>,
@@ -304,16 +339,22 @@ pub fn key_entry<'a, M: 'a + Clone>(
     .align_x(Horizontal::Left)
     .width(200);
     let row = row![
-        icon,
+        badge::tile(kind.into()),
         designation,
         message,
         error,
-        Space::with_width(Length::Fill),
+        Space::fill_width(),
         tt
     ]
     .align_y(Vertical::Center)
-    .spacing(H_SPACING);
-    button::device(row, on_press)
+    .spacing(list::ENTRY_H_SPACING)
+    .width(Length::Fill);
+    button::list_entry(
+        row,
+        None,
+        button::EntryWidth::Custom(BTN_W as f32),
+        on_press,
+    )
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -335,72 +376,12 @@ impl Display for Account {
     }
 }
 
-pub enum DeviceMark {
-    Processing,
-    NotInPath,
-    Unrelated,
-    WrongNetwork,
-    ConnectionError,
-    Locked(Option<String>),
-    OutdatedFirmware(String),
-    Signed,
-    Registered,
-    Selected,
-}
-
-impl Display for DeviceMark {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeviceMark::Processing => write!(f, "Processing, please check your device"),
-            DeviceMark::NotInPath => write!(f, "This signer is not part of this spending path."),
-            DeviceMark::Unrelated => {
-                write!(
-                    f,
-                    "This signing device is not related to this Liana wallet."
-                )
-            }
-            DeviceMark::WrongNetwork => write!(f, "Wrong network in the device settings"),
-            DeviceMark::ConnectionError => write!(f, "Connection error"),
-            DeviceMark::Locked(Some(code)) => write!(f, "Locked, check code: {code}"),
-            DeviceMark::Locked(None) => write!(f, "Locked"),
-            DeviceMark::OutdatedFirmware(version) => {
-                write!(f, "Install firmware version {version} or later")
-            }
-            DeviceMark::Signed => write!(f, "Signed"),
-            DeviceMark::Registered => write!(f, "Registered"),
-            DeviceMark::Selected => Ok(()),
-        }
-    }
-}
-
-impl DeviceMark {
-    pub fn element<'a, M: 'static>(&self) -> Element<'a, M> {
-        match self {
-            DeviceMark::Signed | DeviceMark::Registered => success_mark(Some(self.to_string())),
-            DeviceMark::Selected => success_mark(None),
-            _ => b5_medium(self.to_string()).into(),
-        }
-    }
-
-    pub fn warning(&self) -> Option<&'static str> {
-        match self {
-            DeviceMark::WrongNetwork => Some(
-                "The wrong bitcoin application is open or the device was initialized with the wrong network",
-            ),
-            DeviceMark::OutdatedFirmware(_) => Some("Please upgrade firmware"),
-            DeviceMark::ConnectionError => {
-                Some("Make sure your device is unlocked and a supported Bitcoin application is opened.")
-            }
-            _ => None,
-        }
-    }
-}
-
-fn device_icon(is_device: bool) -> Text<'static> {
+/// Physical device rows get the device tile, the hot signer row gets a key tile.
+fn device_tile(is_device: bool) -> Tile {
     if is_device {
-        icon::usb_drive_icon()
+        Tile::Device
     } else {
-        icon::round_key_icon()
+        Tile::KeyInternal
     }
 }
 
@@ -427,19 +408,11 @@ fn device_designation<'a, M: 'a>(
     .align_x(Horizontal::Left)
 }
 
-fn success_mark<'a, M: 'static>(label: Option<String>) -> Element<'a, M> {
-    row![label.map(b5_medium), badge::success()]
-        .align_y(Vertical::Center)
-        .spacing(H_SPACING)
-        .into()
-}
-
 pub fn device_entry<'a, M, F, K, A>(
     fingerprint: Option<F>,
     kind: Option<K>,
     alias: Option<A>,
-    mark: Option<DeviceMark>,
-    warning: Option<&'static str>,
+    status: DeviceStatus,
     on_press: Option<M>,
 ) -> Element<'a, M>
 where
@@ -448,16 +421,39 @@ where
     K: Display + 'a,
     A: Display + 'a,
 {
-    let icon = device_icon(kind.is_some());
-    let warning = warning.or_else(|| mark.as_ref().and_then(DeviceMark::warning));
-    let mark: Option<Element<'a, M>> = mark.map(|m| m.element());
-    let warning =
-        warning.map(|w| tooltip::tooltip_custom(w, icon::warning_icon(), Position::Bottom));
+    let tile = device_tile(kind.is_some());
     let designation = device_designation(kind, alias, fingerprint);
-    let row = row![icon, designation, Space::fill_width(), mark, warning]
-        .align_y(Vertical::Center)
-        .spacing(H_SPACING);
-    button::device(row, on_press)
+    let row = row![
+        badge::tile(tile),
+        designation,
+        Space::fill_width(),
+        Option::<Element<'a, M>>::from(status)
+    ]
+    .align_y(Vertical::Center)
+    .spacing(list::ENTRY_H_SPACING)
+    .width(Length::Fill);
+    button::list_entry(row, None, button::EntryWidth::Fill, on_press)
+}
+
+/// Derivation-account picker: a dropdown over accounts 0..10 for the given device.
+pub fn account_pick_list<'a, Message: Clone + 'a>(
+    fingerprint: Fingerprint,
+    selected: Option<ChildNumber>,
+    on_select: impl Fn(Account) -> Message + 'a,
+) -> PickList<'a, Account, Vec<Account>, Account, Message> {
+    let accounts: Vec<Account> = (0..10)
+        .map(|i| {
+            Account::new(
+                ChildNumber::from_hardened_idx(i).expect("hardcoded"),
+                fingerprint,
+            )
+        })
+        .collect();
+    let selected = Account::new(
+        selected.unwrap_or(ChildNumber::from_hardened_idx(0).expect("hardcoded")),
+        fingerprint,
+    );
+    pick_list::pick_list(accounts, Some(selected), on_select)
 }
 
 pub fn account_device_entry<'a, M, K, A>(
@@ -472,27 +468,16 @@ where
     K: Display + 'a,
     A: Display + 'a,
 {
-    let accounts: Vec<Account> = (0..10)
-        .map(|i| {
-            Account::new(
-                ChildNumber::from_hardened_idx(i).expect("hardcoded"),
-                fingerprint,
-            )
-        })
-        .collect();
-    let selected = Account::new(
-        selected.unwrap_or(ChildNumber::from_hardened_idx(0).expect("hardcoded")),
-        fingerprint,
-    );
-    let picker = pick_list::pick_list(accounts, Some(selected), |a: Account| {
+    let picker = account_pick_list(fingerprint, selected, |a: Account| {
         (a.fingerprint, a.index).into()
     });
-    let icon = device_icon(kind.is_some());
+    let tile = device_tile(kind.is_some());
     let designation = device_designation(kind, alias, Some(format!("#{fingerprint}")));
-    let row = row![icon, designation, Space::fill_width(), picker]
+    let row = row![badge::tile(tile), designation, Space::fill_width(), picker]
         .align_y(Vertical::Center)
-        .spacing(H_SPACING);
-    button::device(row, on_press)
+        .spacing(list::ENTRY_H_SPACING)
+        .width(Length::Fill);
+    button::list_entry(row, None, button::EntryWidth::Fill, on_press)
 }
 
 /// Row entry for an expected key in a registration-style flow.
@@ -500,6 +485,7 @@ pub fn registration_key_entry<'a, Message, M>(
     fingerprint: String,
     kind: Option<String>,
     alias: Option<String>,
+    entry_status: list::EntryRegisterStatus,
     status: Option<String>,
     on_press: Option<M>,
 ) -> Element<'a, Message>
@@ -507,24 +493,20 @@ where
     M: 'static + Fn() -> Message,
     Message: Clone + 'static,
 {
-    let icon = device_icon(kind.is_some());
-    let status = status.map(b5_medium);
-    let designation = device_designation(kind, alias, Some(fingerprint));
-    let row = row![
-        icon,
-        designation,
-        Space::fill_width(),
-        status,
-        Space::fill_width()
-    ]
-    .align_y(Vertical::Center)
-    .spacing(H_SPACING);
     let msg = on_press.map(|f| f());
-    button::device(row, msg)
+    let title = alias.unwrap_or_else(|| kind.unwrap_or_else(|| fingerprint.clone()));
+    let status: Option<Element<'a, Message>> = status.map(|status| b5_medium(status).into());
+    let title = b5_medium(title);
+    let fingerprint = caption(fingerprint).style(theme::text::secondary);
+    let body = column![title, fingerprint, status]
+        .spacing(2)
+        .width(Length::Fill);
+
+    list::entry_register(entry_status, body, None, msg.is_some(), msg)
 }
 
-pub fn button_entry<'a, Message, M>(
-    icon: Option<Text<'static>>,
+fn button_entry<'a, Message, M>(
+    tile: Tile,
     label: &'a str,
     tooltip_str: Option<&'static str>,
     error: Option<String>,
@@ -534,23 +516,191 @@ where
     M: 'static + Fn() -> Message,
     Message: Clone + 'static,
 {
-    let error = error.map(|e| {
-        row![
-            caption(e).color(color::ORANGE),
-            Space::with_width(Length::Fill)
-        ]
-    });
+    let error = error.map(|e| row![caption(e).color(color::ORANGE), Space::fill_width()]);
 
     let tt = tooltip_str.map(|s| tooltip(s));
 
-    let row = row![icon, caption(label), Space::fill_width(), tt]
-        .spacing(H_SPACING)
+    let row = row![badge::tile(tile), caption(label), Space::fill_width(), tt]
+        .spacing(list::ENTRY_H_SPACING)
         .align_y(Vertical::Center);
 
     let col = column![row, error].width(Length::Fill);
 
     let msg = on_press.map(|f| f());
-    button::device(col, msg)
+    button::list_entry(col, None, button::EntryWidth::Fill, msg)
+}
+
+/// Entry loading an extended public key from a file.
+pub fn import_xpub_entry<'a, Message, M>(
+    error: Option<String>,
+    on_press: Option<M>,
+) -> Element<'a, Message>
+where
+    M: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    button_entry(
+        Tile::Import,
+        "Import extended public key file",
+        None,
+        error,
+        on_press,
+    )
+}
+
+/// Entry generating a key stored on this computer.
+pub fn generate_hot_key_entry<'a, Message, M>(on_press: Option<M>) -> Element<'a, Message>
+where
+    M: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    button_entry(
+        Tile::KeyHot,
+        "Generate hot key stored on this computer",
+        Some("We recommend to use this option only for test purposes"),
+        None,
+        on_press,
+    )
+}
+
+/// Collapsible entry pasting an extended public key.
+pub fn paste_xpub_entry<'a, Message, Paste, Collapse, Input>(
+    collapsed: bool,
+    network: Network,
+    input_value: &Value<String>,
+    input_message: Option<Input>,
+    paste_message: Option<Paste>,
+    collapse_message: Collapse,
+) -> Element<'a, Message>
+where
+    Input: 'static + Fn(String) -> Message,
+    Paste: 'static + Fn() -> Message,
+    Collapse: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    collapsible_input_button(
+        collapsed,
+        Tile::Paste,
+        "Paste an extended public key".to_string(),
+        example_xpub(network),
+        input_value,
+        input_message,
+        paste_message,
+        collapse_message,
+    )
+}
+
+/// Collapsible entry entering a Safety Net token.
+pub fn safety_net_token_entry<'a, Message, Paste, Collapse, Input>(
+    collapsed: bool,
+    input_value: &Value<String>,
+    input_message: Option<Input>,
+    paste_message: Option<Paste>,
+    collapse_message: Collapse,
+) -> Element<'a, Message>
+where
+    Input: 'static + Fn(String) -> Message,
+    Paste: 'static + Fn() -> Message,
+    Collapse: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    token_entry(
+        "Enter a Safety Net token",
+        collapsed,
+        input_value,
+        input_message,
+        paste_message,
+        collapse_message,
+    )
+}
+
+/// Collapsible entry entering a Cosigner token.
+pub fn cosigner_token_entry<'a, Message, Paste, Collapse, Input>(
+    collapsed: bool,
+    input_value: &Value<String>,
+    input_message: Option<Input>,
+    paste_message: Option<Paste>,
+    collapse_message: Collapse,
+) -> Element<'a, Message>
+where
+    Input: 'static + Fn(String) -> Message,
+    Paste: 'static + Fn() -> Message,
+    Collapse: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    token_entry(
+        "Enter a Cosigner token",
+        collapsed,
+        input_value,
+        input_message,
+        paste_message,
+        collapse_message,
+    )
+}
+
+fn token_entry<'a, Message, Paste, Collapse, Input>(
+    label: &'static str,
+    collapsed: bool,
+    input_value: &Value<String>,
+    input_message: Option<Input>,
+    paste_message: Option<Paste>,
+    collapse_message: Collapse,
+) -> Element<'a, Message>
+where
+    Input: 'static + Fn(String) -> Message,
+    Paste: 'static + Fn() -> Message,
+    Collapse: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    collapsible_input_button(
+        collapsed,
+        Tile::EnterToken,
+        label.to_string(),
+        TOKEN_PLACEHOLDER.to_string(),
+        input_value,
+        input_message,
+        paste_message,
+        collapse_message,
+    )
+}
+
+/// Collapsible entry typing a mnemonic, gated behind a disclaimer checkbox.
+#[allow(clippy::too_many_arguments)]
+pub fn enter_mnemonic_entry<'a, Message, Ack, Input, Paste, Collapse>(
+    collapsed: bool,
+    ack: bool,
+    input_value: &Value<String>,
+    ack_message: Ack,
+    input_message: Input,
+    paste_message: Paste,
+    collapse_message: Collapse,
+) -> Element<'a, Message>
+where
+    Ack: 'static + Fn(bool) -> Message,
+    Input: 'static + Fn(String) -> Message,
+    Paste: 'static + Fn() -> Message,
+    Collapse: 'static + Fn() -> Message,
+    Message: Clone + 'static,
+{
+    acked_input_button(
+        collapsed,
+        ack,
+        Tile::Mnemonic,
+        "UNSAFE: Enter mnemonic of one of the keys",
+        " This option is not secure. I understand that entering a mnemonic on a computer may result in theft of my funds.",
+        MNEMONIC_PLACEHOLDER,
+        input_value,
+        ack_message,
+        input_message,
+        paste_message,
+        collapse_message,
+    )
+}
+
+fn example_xpub(network: Network) -> String {
+    format!("[aabbccdd/42'/0']{}pub6DAkq8LWw91WGgUGnkR5Sbzjev5JCsXaTVZQ9MwsPV4BkNFKygtJ8GHodfDVx1udR723nT7JASqGPpKvz7zQ25pUTW6zVEBdiWoaC4aUqik",
+        if network == Network::Bitcoin { "x" } else { "t" }
+    )
 }
 
 pub fn modal_no_devices_placeholder<'a, M: 'a>() -> Element<'a, M> {

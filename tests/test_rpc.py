@@ -26,7 +26,7 @@ MAX_DERIV = 2**31 - 1
 def test_getinfo(lianad):
     res = lianad.rpc.getinfo()
     assert "timestamp" in res.keys()
-    assert res["version"] == "14.0-dev"
+    assert res["version"] == "15.0-dev"
     assert res["network"] == "regtest"
     wait_for(lambda: lianad.rpc.getinfo()["block_height"] == 101)
     res = lianad.rpc.getinfo()
@@ -1298,7 +1298,15 @@ def test_create_recovery(lianad, bitcoind):
     ][0]
     reco_address = bitcoind.rpc.getnewaddress()
     res = lianad.rpc.createrecovery(reco_address, 18)
+
+    # No warnings because it swept to an external address
+    assert len(res["warnings"]) == 0
     reco_psbt = PSBT.from_base64(res["psbt"])
+
+    # Recover to own address but warn user about re-lock behaviour
+    own_address = lianad.rpc.getnewaddress()["address"]
+    res_own = lianad.rpc.createrecovery(address=own_address, feerate=18)
+    assert res_own["warnings"] == ["to_own_address"]
 
     # Do the same passing all three coins explicitly:
     res_op = lianad.rpc.createrecovery(reco_address, 18, 10, first_outpoints)

@@ -3,7 +3,11 @@ use crate::state::{
     Msg as Message, SharedWaker, State,
 };
 use crossbeam::channel::{self};
-use iced::Task;
+use iced::{
+    event,
+    keyboard::{self, key::Named},
+    Subscription, Task,
+};
 use liana::miniscript::bitcoin::{self};
 use liana_gui::{
     dir::LianaDirectory,
@@ -19,8 +23,6 @@ use tracing::debug;
 
 /// BusinessInstaller implements the Installer trait from liana-gui.
 pub struct BusinessInstaller {
-    datadir: LianaDirectory,
-    network: bitcoin::Network,
     state: State,
 }
 
@@ -47,7 +49,7 @@ impl BusinessInstaller {
         }
 
         let mut state = State::new(network, datadir.clone());
-        state.backend.set_network(network, datadir.clone());
+        state.backend.set_network(network, datadir);
 
         // Validate cached tokens before showing UI
         let (valid_accounts, to_remove) = state.backend.validate_all_cached_tokens();
@@ -67,11 +69,7 @@ impl BusinessInstaller {
             liana_ui::widget::text_input::focus("login_email")
         };
 
-        let installer = Self {
-            datadir,
-            network,
-            state,
-        };
+        let installer = Self { state };
 
         (installer, focus_task)
     }
@@ -101,6 +99,19 @@ impl Installer<'_, Message> for BusinessInstaller {
         self.state.update(message)
     }
 
+    fn subscription(&self) -> Subscription<Message> {
+        iced::event::listen_with(|event, status, _| match (event, status) {
+            (
+                iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(Named::Escape),
+                    ..
+                }),
+                event::Status::Ignored,
+            ) => Some(Message::EscapePressed),
+            _ => None,
+        })
+    }
+
     fn view(&self) -> Element<'_, Message> {
         self.state.view()
     }
@@ -111,11 +122,11 @@ impl Installer<'_, Message> for BusinessInstaller {
     }
 
     fn datadir(&self) -> &LianaDirectory {
-        &self.datadir
+        &self.state.datadir
     }
 
     fn network(&self) -> bitcoin::Network {
-        self.network
+        self.state.network
     }
 
     fn skip_launcher() -> bool {
@@ -123,7 +134,7 @@ impl Installer<'_, Message> for BusinessInstaller {
     }
 
     fn backend_type() -> BackendType {
-        BackendType::LianaBusiness
+        BackendType::LianaBusiness(crate::VERSION)
     }
 
     fn exit_maybe(&mut self, _msg: &Message) -> Option<NextState> {
@@ -146,9 +157,13 @@ impl Installer<'_, Message> for BusinessInstaller {
             // Use RunLianaBusiness for direct transition to App
             // User is already authenticated, tokens are cached in connect.json
             return Some(NextState::RunLianaBusiness {
-                datadir: self.datadir.clone(),
-                network: self.network,
+                datadir: self.state.datadir.clone(),
+                network: self.state.network,
                 wallet_id,
+                // user_id will be populated lazily on the next connect via
+                // `backfill_local_link`, since the business installer flow
+                // does not currently retain a connected BackendClient here.
+                user_id: None,
                 email,
             });
         }

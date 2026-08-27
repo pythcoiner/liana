@@ -51,6 +51,7 @@ pub trait Step {
         &'a self,
         _hws: &'a HardwareWallets,
         progress: (usize, usize),
+        network: Network,
         email: Option<&'a str>,
     ) -> Element<'a, Message>;
 
@@ -122,7 +123,7 @@ impl Step for Final {
                 if let Some((pk, _)) = self.key_redemptions.iter().find(|(_, v)| v.is_none()) {
                     let ua = BackendType::LianaConnect.user_agent();
                     let url = (self.network != Network::Bitcoin)
-                        .then(|| std::env::var("LIANA_KEYS_SIGNET_API_URL").ok())
+                        .then_some(std::env::var("LIANA_KEYS_SIGNET_API_URL").ok())
                         .flatten();
                     let client =
                         liana_connect::keys::Client::new_with_optional_url(url.as_deref(), &ua);
@@ -189,10 +190,12 @@ impl Step for Final {
         &'a self,
         _hws: &'a HardwareWallets,
         progress: (usize, usize),
+        network: Network,
         email: Option<&'a str>,
     ) -> Element<'a, Message> {
         view::install(
             progress,
+            network,
             email,
             self.generating,
             self.wallet_settings.is_some(),

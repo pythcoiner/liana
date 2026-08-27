@@ -437,9 +437,9 @@ impl DefineSpend {
                     .create_recovery(max_address.clone(), &outpoints, feerate_vb, Some(reco_tl))
                     .await
                     // Map the PSBT to `CreateSpendResult` result. We only need the PSBT below.
-                    .map(|psbt| CreateSpendResult::Success {
+                    .map(|(psbt, warnings)| CreateSpendResult::Success {
                         psbt,
-                        warnings: vec![],
+                        warnings: warnings.iter().map(|w| w.to_string()).collect(),
                     })
             } else {
                 daemon
@@ -620,7 +620,7 @@ impl Step for DefineSpend {
             Message::View(view::Message::CreateSpend(msg)) => {
                 match msg {
                     view::CreateSpendMessage::BatchLabelEdited(label) => {
-                        self.batch_label.valid = label.len() <= 100;
+                        self.batch_label.valid = super::super::label::is_valid_label_value(&label);
                         self.batch_label.value = label;
                     }
                     view::CreateSpendMessage::Clear => {
@@ -738,7 +738,9 @@ impl Step for DefineSpend {
                                         )
                                         .await
                                         .map_err(|e| e.into())
-                                        .map(|psbt| (psbt, vec![]))
+                                        .map(|(psbt, warnings)| {
+                                            (psbt, warnings.iter().map(|w| w.to_string()).collect())
+                                        })
                                 },
                                 Message::Psbt,
                             );
@@ -1081,7 +1083,7 @@ impl Recipient {
                 }
             }
             view::CreateSpendMessage::RecipientEdited(_, "label", label) => {
-                self.label.valid = label.len() <= 100;
+                self.label.valid = super::super::label::is_valid_label_value(&label);
                 self.label.value = label;
             }
             _ => {}

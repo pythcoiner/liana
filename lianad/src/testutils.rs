@@ -156,8 +156,10 @@ struct DummyDbState {
     timestamp: u32,
     rescan_timestamp: Option<u32>,
     last_poll_timestamp: Option<u32>,
+    derived_addresses: HashMap<bitcoin::Address, (bip32::ChildNumber, bool)>,
 }
 
+#[derive(Clone)]
 pub struct DummyDatabase {
     db: sync::Arc<sync::RwLock<DummyDbState>>,
 }
@@ -191,6 +193,7 @@ impl DummyDatabase {
                 timestamp: now,
                 rescan_timestamp: None,
                 last_poll_timestamp: None,
+                derived_addresses: HashMap::new(),
             })),
         }
     }
@@ -199,6 +202,19 @@ impl DummyDatabase {
         for coin in coins {
             self.db.write().unwrap().coins.insert(coin.outpoint, coin);
         }
+    }
+
+    pub fn insert_derived_address(
+        &mut self,
+        addr: bitcoin::Address,
+        index: bip32::ChildNumber,
+        is_change: bool,
+    ) {
+        self.db
+            .write()
+            .unwrap()
+            .derived_addresses
+            .insert(addr, (index, is_change));
     }
 }
 
@@ -363,9 +379,9 @@ impl DatabaseConnection for DummyDatabase {
 
     fn derivation_index_by_address(
         &mut self,
-        _: &bitcoin::Address,
+        addr: &bitcoin::Address,
     ) -> Option<(bip32::ChildNumber, bool)> {
-        None
+        self.db.read().unwrap().derived_addresses.get(addr).copied()
     }
 
     fn coins_by_outpoints(

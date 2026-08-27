@@ -5,52 +5,61 @@ pub mod modals;
 pub mod org_select;
 pub mod paths;
 pub mod registration;
-pub mod template_builder;
+pub mod wallet_edit;
 pub mod wallet_select;
 pub mod xpub;
 
 pub use keys::keys_view;
 use liana_connect::ws_business::{self, UserRole};
-use liana_ui::component::{button::btn_breadcrumb_previous, text::capitalize_first};
+pub use liana_ui::component::installer::{intro_description, intro_prompt, screen_intro};
+use liana_ui::component::{installer as installer_layout, text::capitalize_first};
 pub use loading::loading_view;
 pub use login::login_view;
+use miniscript::bitcoin::Network;
 pub use org_select::org_select_view;
+pub use paths::template_builder_view;
 pub use registration::registration_view;
-pub use template_builder::template_builder_view;
 pub use wallet_select::wallet_select_view;
 pub use xpub::xpub_view;
 
-use crate::{backend::Backend, state::message::Msg, state::State};
+use crate::{
+    backend::Backend,
+    state::{message::Msg, State},
+};
 use iced::{
-    widget::{column, container, row, Space},
+    widget::{column, container, Space},
     Alignment, Length,
 };
 use liana_ui::{
     component::{
-        button::icon_btn,
-        card::clickable_card,
-        form, scrollable,
+        button::{self, EntryWidth},
+        form, list,
         text::{self, short_email, truncate},
+        tooltip,
     },
-    icon, theme,
+    spacing::VSpacing,
+    theme,
     widget::*,
+    Variant,
 };
 use uuid::Uuid;
 
-pub const INSTALLER_STEPS: usize = 5;
-pub const MENU_ENTRY_WIDTH: u32 = 600;
-pub const ACCOUNT_ENTRY_WIDTH: u32 = MENU_ENTRY_WIDTH - 80;
+pub const INSTALLER_STEPS: usize = 7;
 pub const MENU_ENTRY_HEIGHT: u32 = 100;
-const EMAIL_ROW_HEIGHT: u32 = 56;
+const CONTENT_WIDTH: f32 = button::STANDARD_ENTRY_WIDTH;
 
-pub fn format_last_edit_info(
+/// Build the collapsed line and the hover detail for a last-edit info.
+/// Visible: "Edited <relative time>". Hover: "Edited by <editor> on <absolute time>".
+fn format_last_edit_info_strings(
     last_edited: Option<u64>,
     last_editor: Option<Uuid>,
     state: &State,
     current_user_email_lower: &str,
-) -> Option<String> {
+) -> Option<(String, String)> {
     let timestamp = last_edited?;
-    let editor_str = last_editor
+    let visible = format!("Edited {}", state.app.format_relative_time(timestamp));
+
+    let editor = last_editor
         .and_then(|editor_id| {
             state.backend.get_user(editor_id).map(|user| {
                 if user.email.to_lowercase() == current_user_email_lower {
@@ -65,8 +74,36 @@ pub fn format_last_edit_info(
         })
         .map(|name| format!(" by {name}"))
         .unwrap_or_default();
-    let relative_time = state.app.format_relative_time(timestamp);
-    Some(format!("Edited{editor_str} {relative_time}"))
+    let absolute = state.app.format_absolute_time(timestamp);
+    let on = if absolute.is_empty() {
+        String::new()
+    } else {
+        format!(" on {absolute}")
+    };
+    let hover = format!("Edited{editor}{on}");
+
+    Some((visible, hover))
+}
+
+pub fn format_last_edit_info<'a, M>(
+    last_edited: Option<u64>,
+    last_editor: Option<Uuid>,
+    state: &State,
+    current_user_email_lower: &str,
+) -> Option<Element<'a, M>>
+where
+    M: 'a + Clone,
+{
+    format_last_edit_info_strings(last_edited, last_editor, state, current_user_email_lower).map(
+        |(visible, hover)| {
+            tooltip::tooltip_custom(
+                text::new::caption(hover).style(theme::text::secondary),
+                text::new::caption(visible).style(theme::text::secondary),
+                iced::widget::tooltip::Position::Bottom,
+            )
+            .into()
+        },
+    )
 }
 
 fn admin_name_from_email(mail: &str) -> Option<String> {
@@ -78,219 +115,80 @@ fn admin_name_from_email(mail: &str) -> Option<String> {
     Some(format!("({})", capitalize_first(n)))
 }
 
-const EMAIL_HEADER_SPACER: u32 = 30;
-
-/// Create a breadcrumb element from path segments.
-/// Renders as "Segment1 > Segment2 > Segment3" with styled separators.
-/// All segments have the same font size (h3), with `>` separators in secondary style.
-fn breadcrumb_header<'a>(segments: &[String]) -> Element<'a, Msg> {
-    let mut row = Row::new().spacing(8).align_y(Alignment::Center);
-
-    for (i, segment) in segments.iter().enumerate() {
-        if i > 0 {
-            // Add separator
-            row = row.push(text::h3(">").style(theme::text::secondary));
-        }
-        row = row.push(text::h3(segment));
-    }
-
-    row.into()
-}
-
-enum LayoutContent<'a> {
-    Scrollable(Element<'a, Msg>),
-    ScrollableList {
-        header: Element<'a, Msg>,
-        list: Element<'a, Msg>,
-        footer: Option<Element<'a, Msg>>,
-    },
-}
-
 fn layout_inner<'a>(
     progress: (usize, usize),
+    network: Network,
     email: Option<&'a str>,
     is_ws_admin: bool,
     breadcrumb: &[String],
-    content: LayoutContent<'a>,
-    padding_left: bool,
+    content: installer_layout::LayoutContent<'a, Msg>,
     previous_message: Option<Msg>,
 ) -> Element<'a, Msg> {
-    let has_left_button = previous_message.is_some() || email.is_some();
-    let msg = if let Some(msg) = previous_message {
-        Some(msg)
-    } else if email.is_some() {
-        Some(Msg::Disconnect)
-    } else {
-        None
-    };
-    let left_button = btn_breadcrumb_previous(msg);
-
-    // Build the top-right row with optional role badge and email
-    let mut email_row = Row::new()
-        .push(Space::with_width(Length::Fill))
-        .spacing(10)
-        .align_y(Alignment::Center);
-
-    if is_ws_admin {
-        email_row = email_row.push(liana_ui::component::pill::ws_admin());
-    }
-
-    if let Some(e) = email {
-        email_row = email_row
-            .push(Container::new(text::p1_medium(e).style(theme::text::accent)).padding(20));
-    } else {
-        email_row = email_row.push(Space::with_height(EMAIL_ROW_HEIGHT));
-    }
-
-    let header = Row::new()
-        .height(EMAIL_ROW_HEIGHT)
-        .align_y(Alignment::Center)
-        .push(if has_left_button {
-            Container::new(left_button)
-                .center_x(Length::FillPortion(2))
-                .into()
-        } else {
-            Element::from(Space::with_width(Length::FillPortion(2)))
-        })
-        .push(Container::new(breadcrumb_header(breadcrumb)).width(Length::FillPortion(8)))
-        .push_maybe(if progress.1 > 0 {
-            Some(
-                Container::new(text::text(format!("{} | {}", progress.0, progress.1)))
-                    .center_x(Length::FillPortion(2)),
-            )
-        } else {
-            None
-        });
-
-    let fill_portion = if padding_left { 8 } else { 10 };
-    let right_spacer = || -> Option<Space> {
-        if padding_left {
-            Some(Space::with_width(Length::FillPortion(2)))
-        } else {
-            None
-        }
-    };
-
-    match content {
-        LayoutContent::Scrollable(inner) => {
-            let content_row = Row::new()
-                .push(Space::with_width(Length::FillPortion(2)))
-                .push(
-                    Container::new(
-                        Column::new()
-                            .push(Space::with_height(Length::Fixed(100.0)))
-                            .push(inner),
-                    )
-                    .width(Length::FillPortion(fill_portion)),
-                )
-                .push_maybe(right_spacer());
-
-            Container::new(scrollable::vertical(
-                Column::new()
-                    .width(Length::Fill)
-                    .push(email_row)
-                    .push(Space::with_height(EMAIL_HEADER_SPACER))
-                    .push(header)
-                    .push(content_row),
-            ))
-            .center_x(Length::Fill)
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .style(theme::container::background)
-            .into()
-        }
-        LayoutContent::ScrollableList {
-            header: header_content,
-            list,
-            footer,
-        } => {
-            let header_area = Row::new()
-                .push(Space::with_width(Length::FillPortion(2)))
-                .push(Container::new(header_content).width(Length::FillPortion(fill_portion)))
-                .push_maybe(right_spacer());
-
-            let list_area = Row::new()
-                .push(Space::with_width(Length::FillPortion(2)))
-                .push(
-                    Container::new(scrollable::vertical(list).height(Length::Fill))
-                        .width(Length::FillPortion(fill_portion))
-                        .align_x(Alignment::Center),
-                )
-                .push_maybe(right_spacer())
-                .height(Length::Fill);
-
-            let footer_area: Option<Row<'a, Msg>> = footer.map(|f| {
-                Row::new()
-                    .push(Space::with_width(Length::FillPortion(2)))
-                    .push(Container::new(f).width(Length::FillPortion(fill_portion)))
-                    .push_maybe(right_spacer())
-            });
-
-            Container::new(
-                Column::new()
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .push(email_row)
-                    .push(Space::with_height(EMAIL_HEADER_SPACER))
-                    .push(header)
-                    .push(header_area)
-                    .push(list_area)
-                    .push_maybe(footer_area),
-            )
-            .center_x(Length::Fill)
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .style(theme::container::background)
-            .into()
-        }
-    }
+    let previous_message = previous_message.or_else(|| email.map(|_| Msg::Disconnect));
+    installer_layout::layout_inner(
+        installer_layout::LayoutConfig {
+            variant: Variant::LianaBusiness,
+            network,
+            email,
+            is_ws_admin,
+            nav_bar: installer_layout::NavBar::Steps {
+                progress,
+                breadcrumb: breadcrumb.to_vec(),
+                previous_message,
+            },
+            content_width: CONTENT_WIDTH,
+        },
+        content,
+    )
 }
 
 pub fn layout<'a>(
     progress: (usize, usize),
+    network: Network,
     email: Option<&'a str>,
     breadcrumb: &[String],
     content: impl Into<Element<'a, Msg>>,
-    padding_left: bool,
     previous_message: Option<Msg>,
 ) -> Element<'a, Msg> {
     layout_inner(
         progress,
+        network,
         email,
         false,
         breadcrumb,
-        LayoutContent::Scrollable(content.into()),
-        padding_left,
+        installer_layout::LayoutContent::Scrollable(content.into()),
         previous_message,
     )
 }
 
 /// Layout variant with fixed header content and a scrollable list section.
 /// The header_content stays fixed at top, only the list_content scrolls.
-/// An optional footer_content can be placed below the scrollable area.
+/// Optional pinned_content and footer_content can be placed below the scrollable area.
 #[allow(clippy::too_many_arguments)]
 pub fn layout_with_scrollable_list<'a>(
     progress: (usize, usize),
+    network: Network,
     email: Option<&'a str>,
     is_ws_admin: bool,
     breadcrumb: &[String],
-    header_content: impl Into<Element<'a, Msg>>,
+    header_content: Option<Element<'a, Msg>>,
     list_content: impl Into<Element<'a, Msg>>,
+    pinned_content: Option<Element<'a, Msg>>,
     footer_content: Option<Element<'a, Msg>>,
-    padding_left: bool,
     previous_message: Option<Msg>,
 ) -> Element<'a, Msg> {
     layout_inner(
         progress,
+        network,
         email,
         is_ws_admin,
         breadcrumb,
-        LayoutContent::ScrollableList {
-            header: header_content.into(),
+        installer_layout::LayoutContent::ScrollableList {
+            header: header_content,
             list: list_content.into(),
+            pinned: pinned_content,
             footer: footer_content,
         },
-        padding_left,
         previous_message,
     )
 }
@@ -298,49 +196,58 @@ pub fn layout_with_scrollable_list<'a>(
 // NOTE: content MUST have width and height to Length::Fill
 pub fn menu_entry(content: Row<'_, Msg>, message: Option<Msg>) -> Container<'_, Msg> {
     let content = content.width(Length::Fill).height(Length::Fill);
-    let card = clickable_card(content, message);
+    let card = button::list_entry(content, None, EntryWidth::Standard, message);
     container(card)
-        .width(MENU_ENTRY_WIDTH)
+        .width(button::STANDARD_ENTRY_WIDTH)
         .height(MENU_ENTRY_HEIGHT)
-}
-
-fn account_entry(content: Row<'_, Msg>, message: Option<Msg>) -> Container<'_, Msg> {
-    menu_entry(content, message).width(ACCOUNT_ENTRY_WIDTH)
-}
-
-fn delete_btn(message: Option<Msg>) -> Button<'static, Msg> {
-    icon_btn(icon::trash_icon(), message)
 }
 
 pub fn menu_key_entry(
     key: &ws_business::Key,
-    last_edit_info: Option<String>,
-    icon: Text<'static>,
-    pill: Element<'static, Msg>,
+    signer: String,
+    kind_pill: Element<'static, Msg>,
+    trailing: Element<'static, Msg>,
     msg: Option<Msg>,
-) -> Container<'static, Msg> {
-    let identity_str = short_email(&key.identity.to_string(), 40);
-    let identity_display = (!identity_str.is_empty())
-        .then(|| text::p2_medium(identity_str).style(theme::text::accent));
-
+    on_delete: Option<Msg>,
+) -> Element<'static, Msg> {
     let alias = truncate(&key.alias, 25);
-    let alias = text::h3(alias).style(theme::text::primary);
 
-    let _last_edit =
-        last_edit_info.map(|info| text::caption(info).style(liana_ui::theme::text::secondary));
-
-    let left = column![row![icon, alias].spacing(10).align_y(Alignment::Center)]
-        .push_maybe(identity_display)
-        // .push_maybe(last_edit)
-        .spacing(5);
-
-    let content = row![left, Space::fill_width(), pill]
-        .align_y(Alignment::Center)
-        .width(Length::Fill)
-        .height(Length::Fill);
-
-    menu_entry(content, msg)
+    list::entry_key(
+        entry_key_kind(&key.key_type),
+        alias,
+        kind_pill,
+        short_email(&signer, 40),
+        Some(trailing),
+        msg,
+        on_delete,
+    )
 }
+
+pub(crate) const KEY_KIND_LABEL: [(ws_business::KeyType, &str); 4] = [
+    (ws_business::KeyType::Internal, "Internal"),
+    (ws_business::KeyType::External, "External"),
+    (ws_business::KeyType::Cosigner, "Cosigner"),
+    (ws_business::KeyType::SafetyNet, "Safety Net"),
+];
+
+pub(crate) fn key_kind_label(key_type: &ws_business::KeyType) -> &'static str {
+    KEY_KIND_LABEL
+        .iter()
+        .find_map(|(kind, label)| (kind == key_type).then_some(*label))
+        .expect("every key type must have a label")
+}
+
+pub(crate) fn entry_key_kind(key_type: &ws_business::KeyType) -> list::EntryKeyKind {
+    match key_type {
+        ws_business::KeyType::Internal => list::EntryKeyKind::Internal,
+        ws_business::KeyType::External => list::EntryKeyKind::External,
+        ws_business::KeyType::Cosigner | ws_business::KeyType::SafetyNet => {
+            list::EntryKeyKind::SafetyNet
+        }
+    }
+}
+
+pub(crate) const SEARCH_ENTRY_THRESHOLD: usize = 5;
 
 /// Optional centered search bar inside a select list view.
 pub struct SelectSearch<'a> {
@@ -352,6 +259,7 @@ pub struct SelectSearch<'a> {
 /// Standard "pick one from a list" page used by org_select and wallet_select.
 pub struct SelectListView<'a> {
     pub progress: (usize, usize),
+    pub network: Network,
     pub email: &'a str,
     pub is_ws_admin: bool,
     pub breadcrumb: Vec<String>,
@@ -362,17 +270,10 @@ pub struct SelectListView<'a> {
 }
 
 pub fn select_list_view(cfg: SelectListView<'_>) -> Element<'_, Msg> {
-    let title_row = Row::new()
-        .push(Space::with_width(Length::Fill))
-        .push(text::h2(cfg.title))
-        .push(Space::with_width(Length::Fill));
-
-    let mut header = Column::new()
-        .push(title_row)
-        .push(Space::with_height(30))
-        .spacing(10)
+    let mut header = column![screen_intro(cfg.title, None, false)]
+        .spacing(VSpacing::M)
         .align_x(Alignment::Center)
-        .padding(20);
+        .padding([0, 20]);
 
     if let Some(search) = cfg.search {
         let value = form::Value {
@@ -383,23 +284,22 @@ pub fn select_list_view(cfg: SelectListView<'_>) -> Element<'_, Msg> {
         let search_form = form::Form::new_trimmed(search.placeholder, &value, search.on_change)
             .size(16)
             .padding(10);
-        let search_container = Container::new(search_form)
-            .width(500)
-            .align_x(Alignment::Center);
-        header = header.push(search_container).push(Space::with_height(10));
+        let search_container = Container::new(search_form).align_x(Alignment::Center);
+        header = header.push(search_container);
     }
 
     let list = cfg.list.push(Space::with_height(50));
 
     layout_with_scrollable_list(
         cfg.progress,
+        cfg.network,
         Some(cfg.email),
         cfg.is_ws_admin,
         &cfg.breadcrumb,
-        header,
+        Some(header.into()),
         list,
         None,
-        true,
+        None,
         cfg.previous_message,
     )
 }

@@ -13,7 +13,9 @@ use crate::{
         amount::{self, amount_with_fiat, AmountSize, Currency, DisplayAmount, FiatAmount},
         button, card,
         checkbox::{labelled_checkbox, labelled_radio},
-        form, pill, scrollable, section,
+        form,
+        label::LABEL_LENGTH_WARNING,
+        pill, scrollable, section,
         text::{caption, new, P1_SIZE},
         tooltip,
     },
@@ -80,7 +82,7 @@ pub fn recipient_card<'a, M: Clone + 'static>(
 
     let description_form: Element<'a, M> = form::Form::new("Payment label", label, on_label_edit)
         .label("Description")
-        .warning("Label length is too long (> 100 char)")
+        .warning(LABEL_LENGTH_WARNING)
         .size(P1_SIZE)
         .padding(10)
         .into();
@@ -255,7 +257,7 @@ pub fn fee_rate_row<'a, M: Clone + 'static, F: Fn(Amount) -> FiatAmount>(
     let label = new::b3("Feerate:");
 
     let input: Element<'a, M> = Container::new(
-        form::Form::new_trimmed("e.g. 5 (in sats/vbyte)", feerate, on_edit)
+        form::Form::new_trimmed("e.g. 5 (in sats/vb)", feerate, on_edit)
             .compact()
             .fee(),
     )
@@ -393,7 +395,7 @@ pub fn coin_row<'a, M: Clone + 'static>(
         new::b3_medium(txt)
     }
     fn label_style(theme: &Theme) -> Style {
-        theme::amount::zeroes(theme, false)
+        theme::amount::sats(theme, false)
     }
     let max_len = label_len(available_width);
     let short = |s: String| -> String {
@@ -406,7 +408,7 @@ pub fn coin_row<'a, M: Clone + 'static>(
     let coin_label: Element<M> = match label {
         CoinLabel::Outpoint(label) => font(short(label)).style(label_style).into(),
         CoinLabel::Transaction(label) => {
-            let from = font("From").style(theme::text::secondary);
+            let from = font("From").style(|t| theme::amount::zeroes(t, false));
             row![from, font(short(label)).style(label_style)]
                 .spacing(5)
                 .into()
