@@ -1572,6 +1572,9 @@ psbt-transaction-broadcast => "Transaction is broadcast"
 
 psbt-transaction-saved => "Transaction is saved"
 
+psbts-signatures-collected
+=> "{ $count ->\n    [one] {$count}/{$threshold} signature collected\n   *[other] {$count}/{$threshold} signatures collected\n}";;
+
 receive-address-label-placeholder => "Enter an address label"
 
 receive-derivation-index => "Derivation index:"
