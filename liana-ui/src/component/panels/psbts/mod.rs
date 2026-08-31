@@ -1,35 +1,40 @@
 use bitcoin::Amount;
 use iced::{
-    widget::{column, row},
-    Alignment, Length,
+    widget::{column, row, text::Style, Space},
+    Alignment,
 };
 use liana::spend::SpendStatus;
 use liana_i18n::t;
 
 use crate::{
     component::{
-        amount::{amount, amount_with_font},
-        badge,
+        amount::{amount_with_fiat_tooltip, AmountSize},
+        card,
+        panels::{
+            self,
+            home::payment::{FiatPrice, FiatSource, PaymentKind},
+        },
         pill::{self, PillWidth},
-        text::new,
+        text::{new, truncate},
     },
-    icon, theme,
-    widget::{Button, Container, Element},
+    spacing::{HSpacing, VSpacing},
+    theme::{self, Theme},
+    widget::{Container, Element, SpaceExt},
 };
 
-/// How far along the signing of a PSBT is: either it spends through a recovery
-/// path, or it has some of the signatures its primary path requires.
+const PSBT_HEIGHT: u32 = 90;
+
 #[derive(Debug, Clone, Copy)]
-pub enum PsbtSigs {
-    Recovery,
-    Primary { count: usize, threshold: usize },
+pub struct PsbtSigs {
+    pub count: usize,
+    pub threshold: usize,
 }
 
 pub fn status_pill<'a, M: 'a>(status: SpendStatus) -> Option<Container<'a, M>> {
     match status {
         SpendStatus::Unsigned => None,
         SpendStatus::Timelocked => Some(pill::timelocked().width(PillWidth::SM)),
-        SpendStatus::Broadcastable => Some(pill::signed().width(PillWidth::SM)),
+        SpendStatus::Broadcastable => Some(pill::signed().width(PillWidth::M)),
         SpendStatus::Broadcast => Some(pill::unconfirmed().width(PillWidth::SM)),
         SpendStatus::Confirmed => Some(pill::confirmed().width(PillWidth::SM)),
         SpendStatus::Deprecated => Some(pill::deprecated().width(PillWidth::SM)),
@@ -42,57 +47,71 @@ pub fn list_entry<'a, M: Clone + 'static>(
     label: Option<&'a str>,
     is_send_to_self: bool,
     is_batch: bool,
+    is_recovery: bool,
     status: SpendStatus,
     sigs: PsbtSigs,
-    spend_amount: Amount,
-    fee_amount: Option<Amount>,
+    amount: Amount,
+    fiat_price: Option<FiatPrice>,
+    available_width: f32,
     msg: Option<M>,
 ) -> Element<'a, M> {
-    let badge = if is_send_to_self {
-        badge::cycle()
+    let PsbtSigs { count, threshold } = sigs;
+    let signed = count >= threshold;
+    let count = count.min(threshold);
+
+    let sigs_text = if available_width >= 1460.0 {
+        t!(
+            "psbts-signatures-collected",
+            count = count,
+            threshold = threshold
+        )
     } else {
-        badge::spend()
+        format!("{count}/{threshold}")
     };
-
-    let sigs = match sigs {
-        PsbtSigs::Recovery => pill::recovery(),
-        PsbtSigs::Primary { count, threshold } => {
-            let counter = new::caption(format!("{}/{threshold}", count.min(threshold)))
-                .style(theme::text::secondary);
-            let key = icon::key_icon().style(theme::text::secondary);
-            Container::new(row![counter, key].spacing(5).align_y(Alignment::Center))
-        }
-    };
-
-    let label = label.map(new::b5_medium);
-
-    let left = row![badge, sigs, label]
-        .spacing(10)
-        .align_y(Alignment::Center)
-        .width(Length::Fill);
-
-    let batch = is_batch.then_some(pill::batch());
-
-    let status = status_pill(status);
-
-    let spent = if is_send_to_self {
-        Container::new(new::b5_medium(t!("common-self-transfer")))
+    let sig_style: fn(&Theme) -> Style = if !signed {
+        theme::text::warning
     } else {
-        Container::new(amount(&spend_amount))
+        theme::text::success
     };
-    let fee = fee_amount.map(|fee| amount_with_font(&fee, new::CAPTION_SPEC));
-    let amounts = column![spent, fee].align_x(Alignment::End).width(140);
+    let sigs = new::b4_medium(sigs_text).style(sig_style);
 
-    let content = row![left, batch, status, amounts]
-        .align_y(Alignment::Center)
-        .spacing(20);
+    let recovery_pill = is_recovery.then_some(pill::recovery().width(PillWidth::WalletStatus));
+    let batch_pill = is_batch.then_some(pill::batch().width(PillWidth::WalletStatus));
 
-    let entry = Button::new(content)
-        .padding(10)
-        .on_press_maybe(msg)
-        .style(theme::button::transparent_border);
+    let status_pill = status_pill(status);
 
-    Container::new(entry)
-        .style(theme::card::button_simple)
-        .into()
+    let max_lbl_chars = (available_width - 500.0) as usize / 22;
+    let mut label = label.map(|l| truncate(l, max_lbl_chars));
+
+    let kind = if is_send_to_self {
+        label = Some(t!("common-self-transfer"));
+        PaymentKind::SendToSelf
+    } else {
+        PaymentKind::Outgoing
+    };
+
+    let label = label.map(|l| new::h2(l).style(theme::text::primary));
+
+    let sigs = row![
+        sigs,
+        status_pill,
+        Space::fill_width(),
+        recovery_pill,
+        batch_pill,
+    ]
+    .align_y(Alignment::Center)
+    .spacing(HSpacing::XL);
+    let left = column![label, sigs].spacing(VSpacing::SM);
+
+    let to_fiat = fiat_price.map(|fp| move |_: Amount| fp.amount);
+    let approximate = fiat_price.is_none_or(|fp| fp.source == FiatSource::Timestamp);
+    let tooltip = fiat_price.map(|fp| fp.source.infotip());
+    let amount = amount_with_fiat_tooltip(&amount, to_fiat, AmountSize::M, approximate, tooltip);
+    let spent = row![kind.icon(), amount]
+        .spacing(HSpacing::S)
+        .align_y(Alignment::Center);
+
+    let content = row![left, spent].spacing(HSpacing::L).height(PSBT_HEIGHT);
+
+    card::list_entry_with_padding(content, msg, panels::LIST_ENTRY_PADDING)
 }
