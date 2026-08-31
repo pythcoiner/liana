@@ -32,6 +32,7 @@ fn tooltip_text<'a>(content: impl Display) -> iced::widget::Text<'a, Theme> {
 pub enum PillWidth {
     S = 90,
     WalletStatus = 100,
+    SM = 120,
     M = 150,
     ML = 175,
     L = 200,
