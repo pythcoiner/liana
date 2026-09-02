@@ -2057,6 +2057,12 @@ settings-import-wallet-description
 
 settings-invitation-sent => "Invitation was sent" => "邀请已发送"
 
+settings-language => "Language" => "语言"
+
+settings-language-description
+=> "Choose the language used by the application."
+=> "选择应用使用的语言。";;
+
 settings-month => "Month:" => "月："
 
 settings-network => "Network:" => "网络："
