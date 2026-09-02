@@ -2269,6 +2269,12 @@ settings-import-wallet-description
 
 settings-invitation-sent => "Invitation was sent" => "Kaset eo bet ar bedadenn"
 
+settings-language => "Language" => "Yezh"
+
+settings-language-description
+=> "Choose the language used by the application."
+=> "Dibabit ar yezh implijet gant an arload.";;
+
 settings-month => "Month:" => "Miz :"
 
 settings-network => "Network:" => "Rouedad :"
