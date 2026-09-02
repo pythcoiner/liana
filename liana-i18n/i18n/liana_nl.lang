@@ -2267,6 +2267,12 @@ settings-import-wallet-description
 
 settings-invitation-sent => "Invitation was sent" => "De uitnodiging is verstuurd"
 
+settings-language => "Language" => "Taal"
+
+settings-language-description
+=> "Choose the language used by the application."
+=> "Kies de taal die de applicatie gebruikt.";;
+
 settings-month => "Month:" => "Maand:"
 
 settings-network => "Network:" => "Netwerk:"
