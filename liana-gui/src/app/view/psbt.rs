@@ -585,9 +585,9 @@ pub fn outputs_view<'a>(
         .filter(|(i, _)| is_payment(i))
         .count();
 
-    let payments: Option<Element<'a, Message>> = (count > 0).then_some({
+    let payments = (count > 0).then_some({
         let title = t!("psbt-payments", count = count);
-        let rows: Column<'a, Message> = tx
+        let rows = tx
             .output
             .iter()
             .enumerate()
@@ -606,14 +606,11 @@ pub fn outputs_view<'a>(
             })
             .collect();
 
-        let header = h4_bold(title).width(Length::Fill);
-        card::foldable::FoldableCard::new(None, header, Some(rows.into()))
-            .padding(20)
-            .into()
+        psbts::collapsible_section(title, rows)
     });
 
-    let change = (!is_external && !change_indexes.is_empty()).then(|| -> Element<'a, Message> {
-        let rows: Column<'a, Message> = tx
+    let change = (!is_external && !change_indexes.is_empty()).then(|| {
+        let rows = tx
             .output
             .iter()
             .enumerate()
@@ -621,10 +618,7 @@ pub fn outputs_view<'a>(
             .map(|(_, output)| change_view(output, network))
             .collect();
 
-        let header = h4_bold(t!("psbt-change")).width(Length::Fill);
-        card::foldable::FoldableCard::new(None, header, Some(rows.into()))
-            .padding(20)
-            .into()
+        psbts::collapsible_section(t!("psbt-change"), rows)
     });
 
     column![payments, change].spacing(20).into()
