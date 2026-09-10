@@ -22,7 +22,7 @@ use crate::{
         },
         pill::{self, PillWidth},
         scrollable,
-        text::{legacy, new, truncate},
+        text::{legacy, new, truncate, Text as _},
     },
     icon,
     spacing::{HSpacing, VSpacing},
@@ -386,4 +386,42 @@ pub fn spend_header<'a, M: 'static>(
     .align_y(Alignment::Center);
 
     column![label, column![spent, fees]].spacing(20).into()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn spend_overview<'a, M: Clone + 'static>(
+    saved: bool,
+    export: Option<M>,
+    import: Option<M>,
+    txid: String,
+    copy_txid: M,
+    signatures: Element<'a, M>,
+    action: Option<Element<'a, M>>,
+) -> Element<'a, M> {
+    let export_button = button::btn_export_psbt(saved, export);
+    let buttons = row![export_button, button::btn_import(import)].spacing(5);
+    let header = row![
+        legacy::text(t!("psbt-title")).bold().width(Length::Fill),
+        buttons
+    ]
+    .align_y(Alignment::Center);
+
+    let txid = row![
+        new::b5_bold(t!("transactions-txid")).width(Length::Fill),
+        legacy::p2_regular(txid).style(theme::text::secondary),
+        button::btn_copy(Some(copy_txid))
+    ]
+    .align_y(Alignment::Center);
+
+    let psbt = column![header, txid].padding(15).spacing(10);
+    let card =
+        Container::new(column![psbt, signatures, Space::with_height(5)]).style(theme::card::simple);
+
+    let action = action.map(|action| {
+        row![Space::fill_width(), action]
+            .align_y(Alignment::Center)
+            .spacing(20)
+    });
+
+    column![card, action].spacing(20).into()
 }
