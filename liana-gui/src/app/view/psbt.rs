@@ -22,11 +22,11 @@ use liana_ui::{
         notification,
         panels::psbts,
         pill,
-        text::{self, *},
+        text::{legacy, new},
     },
     icon,
     spacing::HSpacing,
-    widget::*,
+    widget::{Column, Container, Element, SpaceExt},
 };
 
 use crate::{
@@ -54,82 +54,51 @@ pub fn psbt_view<'a>(
     currently_signing: bool,
     warning: Option<&'a Error>,
 ) -> Element<'a, Message> {
-    let delete_msg = if currently_signing {
-        None
+    let recovery = (!tx.sigs.recovery_paths().is_empty()).then_some(pill::recovery());
+    let status = psbts::status_pill(tx.status);
+    let header = row![
+        Container::new(legacy::h3(t!("psbt-title"))).width(Length::Fill),
+        recovery,
+        status
+    ]
+    .align_y(Alignment::Center)
+    .spacing(10);
+
+    let inputs = inputs_view(&tx.coins, &tx.psbt.unsigned_tx, &tx.labels, labels_editing);
+    let outputs = outputs_view(
+        &tx.psbt.unsigned_tx,
+        network,
+        &tx.change_indexes,
+        &tx.labels,
+        labels_editing,
+        tx.is_single_payment().is_some(),
+        false,
+    );
+
+    let action = if saved {
+        let delete_msg = (!currently_signing).then_some(Message::Spend(SpendTxMessage::Delete));
+        row![btn_delete(delete_msg)].width(Length::Fill)
     } else {
-        Some(Message::Spend(SpendTxMessage::Delete))
+        let save_msg = (!currently_signing).then_some(Message::Spend(SpendTxMessage::Save));
+        row![Space::fill_width(), btn_save(save_msg, false)].width(Length::Fill)
     };
-    dashboard(
-        &Menu::PSBTs,
-        cache,
-        warning,
-        Column::new()
-            .spacing(20)
-            .push(
-                Row::new()
-                    .align_y(Alignment::Center)
-                    .spacing(10)
-                    .push(Container::new(h3("PSBT")).width(Length::Fill))
-                    .push_maybe(if !tx.sigs.recovery_paths().is_empty() {
-                        Some(pill::recovery())
-                    } else {
-                        None
-                    })
-                    .push_maybe(match tx.status {
-                        SpendStatus::Deprecated => Some(pill::deprecated()),
-                        SpendStatus::Broadcast => Some(pill::unconfirmed()),
-                        SpendStatus::Confirmed => Some(pill::spent()),
-                        SpendStatus::Timelocked => Some(pill::timelocked()),
-                        SpendStatus::Unsigned
-                        | SpendStatus::Broadcastable
-                        | SpendStatus::Unknown => None,
-                    }),
-            )
-            .push(spend_header(tx, labels_editing))
-            .push(spend_overview_view(
-                tx,
-                desc_info,
-                key_aliases,
-                currently_signing,
-                saved,
-            ))
-            .push(
-                Column::new()
-                    .spacing(20)
-                    .push(inputs_view(
-                        &tx.coins,
-                        &tx.psbt.unsigned_tx,
-                        &tx.labels,
-                        labels_editing,
-                    ))
-                    .push(outputs_view(
-                        &tx.psbt.unsigned_tx,
-                        network,
-                        &tx.change_indexes,
-                        &tx.labels,
-                        labels_editing,
-                        tx.is_single_payment().is_some(),
-                        false,
-                    )),
-            )
-            .push(if saved {
-                row![btn_delete(delete_msg)].width(Length::Fill)
-            } else {
-                Row::new()
-                    .push(Space::with_width(Length::Fill))
-                    .push(btn_save(
-                        (!currently_signing).then_some(Message::Spend(SpendTxMessage::Save)),
-                        false,
-                    ))
-                    .width(Length::Fill)
-            })
-            .push(Space::with_height(10)),
-    )
+
+    let content = column![
+        header,
+        spend_header(tx, labels_editing),
+        spend_overview_view(tx, desc_info, key_aliases, currently_signing, saved),
+        column![inputs, outputs].spacing(20),
+        action,
+        Space::with_height(10)
+    ]
+    .spacing(20);
+
+    dashboard(&Menu::PSBTs, cache, warning, content)
 }
 
 pub fn save_action<'a>(warning: Option<&Error>, saved: bool) -> Element<'a, Message> {
     let content: Element<'a, Message> = if saved {
-        Container::new(text(t!("psbt-transaction-saved")))
+        Container::new(legacy::text(t!("psbt-transaction-saved")))
             .align_x(iced::alignment::Horizontal::Center)
             .into()
     } else {
@@ -139,7 +108,7 @@ pub fn save_action<'a>(warning: Option<&Error>, saved: bool) -> Element<'a, Mess
 
         column![
             warning.map(|w| warn(Some(w))),
-            text(t!("psbt-save-transaction")),
+            legacy::text(t!("psbt-save-transaction")),
             buttons
         ]
         .spacing(10)
@@ -159,7 +128,7 @@ pub fn broadcast_action<'a>(
     saved: bool,
 ) -> Element<'a, Message> {
     if saved {
-        let content = Container::new(text(t!("psbt-transaction-broadcast")))
+        let content = Container::new(legacy::text(t!("psbt-transaction-broadcast")))
             .align_x(iced::alignment::Horizontal::Center);
         return modal_view(None::<String>, None, None, ModalWidth::S, content);
     }
@@ -177,15 +146,15 @@ pub fn broadcast_action<'a>(
             )
         };
 
-        let warning = row![icon::warning_icon(), text(invalidates)].spacing(10);
-        let explanation = row![text(conflicts)].padding([0, 30]);
+        let warning = row![icon::warning_icon(), legacy::text(invalidates)].spacing(10);
+        let explanation = row![legacy::text(conflicts)].padding([0, 30]);
 
         conflicting_txids
             .iter()
             .fold(column![warning, explanation].spacing(5), |col, txid| {
                 let copy = button::btn_copy(Some(Message::Clipboard(txid.to_string())));
                 col.push(
-                    row![text(txid.to_string()), copy]
+                    row![legacy::text(txid.to_string()), copy]
                         .padding([0, 30])
                         .spacing(5)
                         .align_y(Alignment::Center),
@@ -200,7 +169,7 @@ pub fn broadcast_action<'a>(
 
     let content = column![
         warning.map(|w| warn(Some(w))),
-        Container::new(h4_bold(t!("psbt-broadcast-transaction"))).width(Length::Fill),
+        Container::new(legacy::h4_bold(t!("psbt-broadcast-transaction"))).width(Length::Fill),
         conflicts,
         confirm
     ]
@@ -239,7 +208,7 @@ pub fn delete_action<'a>(warning: Option<&Error>, deleted: bool) -> Element<'a, 
     };
     let text = row![
         Space::fill_width(),
-        text::new::caption(message),
+        new::caption(message),
         Space::fill_width()
     ];
     let content = column![warning, text, Space::fill_height(), content].height(100);
@@ -263,14 +232,14 @@ pub fn spend_header<'a>(
         let outpoint = outpoint.to_string();
         let labelled = vec![outpoint.clone(), txid.clone()];
         if let Some(label) = labels_editing.get(&outpoint) {
-            label::label_editing(labelled, label, H3_SIZE)
+            label::label_editing(labelled, label, legacy::H3_SIZE)
         } else {
-            label::label_editable(labelled, tx.labels.get(&outpoint), H3_SIZE)
+            label::label_editable(labelled, tx.labels.get(&outpoint), legacy::H3_SIZE)
         }
     } else if let Some(label) = labels_editing.get(&txid) {
-        label::label_editing(vec![txid.clone()], label, H3_SIZE)
+        label::label_editing(vec![txid.clone()], label, legacy::H3_SIZE)
     } else {
-        label::label_editable(vec![txid.clone()], tx.labels.get(&txid), H3_SIZE)
+        label::label_editable(vec![txid.clone()], tx.labels.get(&txid), legacy::H3_SIZE)
     };
 
     psbts::spend_header(
@@ -429,9 +398,13 @@ fn input_view<'a>(
     let outpoint = outpoint.to_string();
 
     let label_widget = if let Some(label) = labels_editing.get(&outpoint) {
-        label::label_editing(vec![outpoint.clone()], label, text::P1_SIZE)
+        label::label_editing(vec![outpoint.clone()], label, legacy::P1_SIZE)
     } else {
-        label::label_editable(vec![outpoint.clone()], labels.get(&outpoint), text::P1_SIZE)
+        label::label_editable(
+            vec![outpoint.clone()],
+            labels.get(&outpoint),
+            legacy::P1_SIZE,
+        )
     };
 
     let address = coin.map(|c| c.address.to_string());
@@ -479,12 +452,12 @@ fn payment_view<'a>(
 
     let label_widget = if is_editable {
         if let Some(label) = labels_editing.get(&outpoint) {
-            label::label_editing(change_labels, label, text::P1_SIZE)
+            label::label_editing(change_labels, label, legacy::P1_SIZE)
         } else {
-            label::label_editable(change_labels, labels.get(&outpoint), text::P1_SIZE)
+            label::label_editable(change_labels, labels.get(&outpoint), legacy::P1_SIZE)
         }
     } else {
-        label::label_non_editable(change_labels, None, text::P1_SIZE)
+        label::label_non_editable(change_labels, None, legacy::P1_SIZE)
     };
 
     let address_label = addr
