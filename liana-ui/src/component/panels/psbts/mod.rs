@@ -16,11 +16,11 @@ use crate::{
             home::payment::{FiatPrice, FiatSource, PaymentKind},
         },
         pill::{self, PillWidth},
-        text::{new, truncate},
+        text::{legacy, new, truncate},
     },
     spacing::{HSpacing, VSpacing},
     theme::{self, Theme},
-    widget::{Container, Element, SpaceExt, Toggler},
+    widget::{Container, Element, Row, SpaceExt, Toggler},
 };
 
 const PSBT_HEIGHT: u32 = 90;
@@ -130,6 +130,26 @@ pub fn list_entry<'a, M: Clone + 'static>(
     card::list_entry_with_padding(content, msg, panels::LIST_ENTRY_PADDING)
 }
 
+fn address_row<'a, M: Clone + 'static>(address: String, copy: M) -> Row<'a, M> {
+    let title = new::b5_bold(t!("common-address-label")).style(theme::text::secondary);
+    let copy = button::btn_copy(Some(copy));
+    row![title, address_view(address), copy]
+        .align_y(Alignment::Center)
+        .width(Length::Fill)
+        .spacing(5)
+}
+
+fn address_label_row<'a, M: 'a>(label: &'a str) -> Row<'a, M> {
+    let title = new::b5_bold(t!("coins-address-label")).style(theme::text::secondary);
+    row![
+        title,
+        legacy::p2_regular(label).style(theme::text::secondary)
+    ]
+    .align_y(Alignment::Center)
+    .width(Length::Fill)
+    .spacing(5)
+}
+
 pub fn change_row<'a, M: Clone + 'static>(
     value: Amount,
     address: String,
@@ -137,14 +157,31 @@ pub fn change_row<'a, M: Clone + 'static>(
 ) -> Element<'a, M> {
     let value = row![Space::fill_width(), amount(&value)];
 
-    let label = new::b5_bold(t!("common-address-label")).style(theme::text::secondary);
-    let copy = button::btn_copy(Some(copy));
-    let address = row![label, address_view(address), copy]
-        .align_y(Alignment::Center)
+    column![value, address_row(address, copy)]
         .width(Length::Fill)
-        .spacing(5);
+        .spacing(5)
+        .into()
+}
 
-    column![value, address]
+pub fn payment_row<'a, M: Clone + 'static>(
+    label: Element<'a, M>,
+    value: Amount,
+    address: Option<String>,
+    address_label: Option<&'a str>,
+    copy_address: Option<M>,
+) -> Element<'a, M> {
+    let header = row![Container::new(label).width(Length::Fill), amount(&value)]
+        .spacing(5)
+        .align_y(Alignment::Center);
+
+    let address = address.zip(copy_address).map(|(address, copy)| {
+        column![
+            address_row(address, copy),
+            address_label.map(address_label_row)
+        ]
+    });
+
+    column![header, address]
         .width(Length::Fill)
         .spacing(5)
         .into()
