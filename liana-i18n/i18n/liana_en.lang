@@ -1541,6 +1541,8 @@ psbt-signed-by => "signed by"
 
 psbt-status => "Status"
 
+psbt-title => "PSBT"
+
 psbt-transaction-broadcast => "Transaction is broadcast"
 
 psbt-transaction-saved => "Transaction is saved"
