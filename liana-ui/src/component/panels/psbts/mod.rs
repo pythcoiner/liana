@@ -1,15 +1,16 @@
 use bitcoin::Amount;
 use iced::{
     widget::{column, row, text::Style, Space},
-    Alignment,
+    Alignment, Length,
 };
 use liana::spend::SpendStatus;
 use liana_i18n::t;
 
 use crate::{
     component::{
-        amount::{amount_with_fiat_tooltip, AmountSize},
-        card,
+        address::address as address_view,
+        amount::{amount, amount_with_fiat_tooltip, AmountSize},
+        button, card,
         panels::{
             self,
             home::payment::{FiatPrice, FiatSource, PaymentKind},
@@ -127,4 +128,24 @@ pub fn list_entry<'a, M: Clone + 'static>(
     let content = row![left, spent].spacing(HSpacing::L).height(PSBT_HEIGHT);
 
     card::list_entry_with_padding(content, msg, panels::LIST_ENTRY_PADDING)
+}
+
+pub fn change_row<'a, M: Clone + 'static>(
+    value: Amount,
+    address: String,
+    copy: M,
+) -> Element<'a, M> {
+    let value = row![Space::fill_width(), amount(&value)];
+
+    let label = new::b5_bold(t!("common-address-label")).style(theme::text::secondary);
+    let copy = button::btn_copy(Some(copy));
+    let address = row![label, address_view(address), copy]
+        .align_y(Alignment::Center)
+        .width(Length::Fill)
+        .spacing(5);
+
+    column![value, address]
+        .width(Length::Fill)
+        .spacing(5)
+        .into()
 }
