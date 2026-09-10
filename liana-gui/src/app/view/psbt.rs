@@ -21,8 +21,8 @@ use liana_ui::{
         list::DeviceStatus,
         modal::{self, modal_view, ModalWidth},
         panels::psbts,
-        pill, scrollable,
-        text::{self, new, *},
+        pill,
+        text::{self, *},
     },
     icon, theme,
     widget::*,
@@ -399,49 +399,13 @@ pub fn spend_overview_view<'a>(
         .into()
 }
 
-fn not_ready_header<'a>() -> Row<'a, Message> {
-    let status = row![
-        icon::circle_cross_icon().style(theme::text::error),
-        text(t!("psbt-not-ready")).style(theme::text::error)
-    ]
-    .spacing(5)
-    .align_y(Alignment::Center)
-    .width(Length::Fill);
-
-    row![new::b5_bold(t!("psbt-status")), status]
-        .align_y(Alignment::Center)
-        .spacing(20)
-}
-
 pub fn signatures<'a>(
     tx: &'a SpendTx,
     desc_info: &'a LianaPolicy,
     keys_aliases: &'a HashMap<Fingerprint, String>,
 ) -> Element<'a, Message> {
     if let Some(sigs) = tx.sigs.signed_path() {
-        let signers = sigs
-            .signed_pubkeys
-            .keys()
-            .fold(Row::new().spacing(5), |row, fg| {
-                row.push(pill::fingerprint(
-                    fg.to_string(),
-                    keys_aliases.get(fg).map(String::as_str),
-                ))
-            });
-
-        let ready = row![
-            new::b5_bold(t!("psbt-status")),
-            icon::circle_check_icon().style(theme::text::success),
-            text(t!("common-ready")).bold().style(theme::text::success),
-            text(t!("psbt-signed-by")),
-            signers
-        ]
-        .align_y(Alignment::Center)
-        .spacing(10);
-
-        return Container::new(scrollable::horizontal_thin(ready))
-            .padding(15)
-            .into();
+        return psbts::signatures_ready(sigs, keys_aliases);
     }
 
     let requirement = if tx.sigs.recovery_paths().is_empty() {
@@ -457,13 +421,7 @@ pub fn signatures<'a>(
         })
     };
 
-    let content = column![text(t!("psbt-finalizing-requires")), requirement]
-        .padding(15)
-        .spacing(10);
-
-    card::foldable::FoldableCard::new(None, not_ready_header(), Some(content.into()))
-        .padding(15)
-        .into()
+    psbts::signatures_missing(requirement)
 }
 
 pub fn inputs_view<'a>(
