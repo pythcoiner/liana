@@ -9,6 +9,7 @@ pub use liana::{
         psbt::Psbt,
         secp256k1, Address, Amount, Network, OutPoint, Transaction, Txid,
     },
+    spend::SpendStatus,
 };
 use liana_ui::component::panels::home::payment::PaymentKind;
 pub use lianad::commands::{
@@ -52,14 +53,6 @@ pub struct SpendTx {
     pub kind: TransactionKind,
 }
 
-#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq)]
-pub enum SpendStatus {
-    Pending,
-    Broadcast,
-    Spent,
-    Deprecated,
-}
-
 /// Status of a spend transaction as it can be told from the coins it spends alone.
 pub fn spend_status_from_coins(psbt: &Psbt, coins: &[Coin]) -> SpendStatus {
     let txid = psbt.unsigned_tx.compute_txid();
@@ -78,7 +71,7 @@ pub fn spend_status_from_coins(psbt: &Psbt, coins: &[Coin]) -> SpendStatus {
             // This tx is spending the coin
             if info.txid == txid {
                 if info.height.is_some() {
-                    status = SpendStatus::Spent;
+                    status = SpendStatus::Confirmed;
                 } else {
                     status = SpendStatus::Broadcast;
                 }

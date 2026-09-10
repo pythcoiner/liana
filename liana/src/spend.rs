@@ -24,6 +24,15 @@ use miniscript::bitcoin::{
 };
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SpendStatus {
+    Pending,
+    Broadcast,
+    Confirmed,
+    Deprecated,
+}
+
 /// We would never create a transaction with an output worth less than this.
 /// That's 0.5$ at 100_000$ per BTC.
 pub const DUST_OUTPUT_SATS: u64 = 500;

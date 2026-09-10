@@ -4,6 +4,7 @@ use std::str::FromStr;
 use liana::{
     descriptors::LianaDescriptor,
     miniscript::bitcoin::{self, bip32, consensus, hashes::hex::FromHex, Amount, OutPoint, Txid},
+    spend::SpendStatus,
 };
 use serde::{de, Deserialize, Deserializer};
 
@@ -343,6 +344,7 @@ pub struct Input {
 pub struct Psbt {
     pub uuid: String,
     pub txid: Txid,
+    pub status: SpendStatus,
     pub fee: Option<u64>,
     pub fee_rate: Option<u64>,
     pub label: Option<String>,
