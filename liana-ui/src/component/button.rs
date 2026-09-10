@@ -18,7 +18,9 @@ use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
         button::{Status, Style},
-        container, row, Space,
+        container, row,
+        tooltip::Position,
+        Space,
     },
     Background, Border, Color, Length, Padding,
 };
@@ -840,6 +842,18 @@ pub fn btn_export<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
         BtnWidth::M,
         msg,
     )
+}
+
+pub fn btn_export_psbt<'a, T: Clone + 'a>(saved: bool, msg: Option<T>) -> Container<'a, T> {
+    if saved {
+        Container::new(btn_export(msg))
+    } else {
+        tooltip::tooltip_custom(
+            caption(t!("psbt-sign-save-before-export")),
+            btn_export(None),
+            Position::Top,
+        )
+    }
 }
 
 pub fn btn_import<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {

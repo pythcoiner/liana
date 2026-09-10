@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use iced::{
-    widget::{column, row, tooltip, Space},
+    widget::{column, row, Space},
     Alignment, Length,
 };
 
@@ -15,13 +15,15 @@ use liana::{
 
 use liana_ui::{
     component::{
-        button::{self, btn_broadcast, btn_delete, btn_export, btn_import, btn_save, btn_sign},
+        button::{
+            self, btn_broadcast, btn_delete, btn_export_psbt, btn_import, btn_save, btn_sign,
+        },
         card, form,
         list::DeviceStatus,
         modal::{self, modal_view, ModalWidth},
         panels::psbts,
         pill,
-        text::{self, *},
+        text::{self, new, *},
     },
     icon, theme,
     widget::*,
@@ -296,84 +298,48 @@ pub fn spend_overview_view<'a>(
     saved: bool,
 ) -> Element<'a, Message> {
     let enabled = saved && !currently_signing;
-    let export_msg = enabled.then_some(Message::ExportPsbt);
-    let export_button = btn_export(export_msg);
-
     let import_msg = enabled.then_some(Message::ImportPsbt);
     let import_button = btn_import(import_msg);
 
-    Column::new()
-        .spacing(20)
-        .push(
-            Container::new(
-                Column::new()
-                    .push(
-                        Column::new()
-                            .padding(15)
-                            .spacing(10)
-                            .push(
-                                Row::new()
-                                    .align_y(Alignment::Center)
-                                    .push(text("PSBT").bold().width(Length::Fill))
-                                    .push(
-                                        Row::new()
-                                            .spacing(5)
-                                            .push(if saved {
-                                                Container::new(export_button)
-                                            } else {
-                                                Container::new(tooltip::Tooltip::new(
-                                                    export_button,
-                                                    Container::new(p1_regular(t!(
-                                                        "psbt-sign-save-before-export"
-                                                    )))
-                                                    .style(theme::card::simple)
-                                                    .padding(10),
-                                                    tooltip::Position::Top,
-                                                ))
-                                            })
-                                            .push(import_button),
-                                    )
-                                    .align_y(Alignment::Center),
-                            )
-                            .push(
-                                Row::new()
-                                    .push(p1_bold(t!("transactions-txid")).width(Length::Fill))
-                                    .push(
-                                        p2_regular(tx.psbt.unsigned_tx.compute_txid().to_string())
-                                            .style(theme::text::secondary),
-                                    )
-                                    .push(button::btn_copy(Some(Message::Clipboard(
-                                        tx.psbt.unsigned_tx.compute_txid().to_string(),
-                                    ))))
-                                    .align_y(Alignment::Center),
-                            ),
-                    )
-                    .push(signatures(tx, desc_info, key_aliases))
-                    .push(Space::with_height(5)),
-            )
-            .style(theme::card::simple),
-        )
-        .push_maybe(
-            match tx.status {
-                SpendStatus::Unsigned => Some(btn_sign(Some(Message::Spend(SpendTxMessage::Sign)))),
-                SpendStatus::Broadcastable => Some(btn_broadcast(Some(Message::Spend(
-                    SpendTxMessage::Broadcast,
-                )))),
-                SpendStatus::Timelocked
-                | SpendStatus::Broadcast
-                | SpendStatus::Confirmed
-                | SpendStatus::Deprecated
-                | SpendStatus::Unknown => None,
-            }
-            .map(|button| {
-                Row::new()
-                    .push(Space::with_width(Length::Fill))
-                    .push(button)
-                    .align_y(Alignment::Center)
-                    .spacing(20)
-            }),
-        )
-        .into()
+    let export_button = btn_export_psbt(saved, enabled.then_some(Message::ExportPsbt));
+    let buttons = row![export_button, import_button].spacing(5);
+    let header =
+        row![text(t!("psbt-title")).bold().width(Length::Fill), buttons].align_y(Alignment::Center);
+
+    let txid = tx.psbt.unsigned_tx.compute_txid().to_string();
+    let txid = row![
+        new::b5_bold(t!("transactions-txid")).width(Length::Fill),
+        p2_regular(txid.clone()).style(theme::text::secondary),
+        button::btn_copy(Some(Message::Clipboard(txid)))
+    ]
+    .align_y(Alignment::Center);
+
+    let psbt = column![header, txid].padding(15).spacing(10);
+    let card = Container::new(column![
+        psbt,
+        signatures(tx, desc_info, key_aliases),
+        Space::with_height(5)
+    ])
+    .style(theme::card::simple);
+
+    let button = match tx.status {
+        SpendStatus::Unsigned => Some(btn_sign(Some(Message::Spend(SpendTxMessage::Sign)))),
+        SpendStatus::Broadcastable => Some(btn_broadcast(Some(Message::Spend(
+            SpendTxMessage::Broadcast,
+        )))),
+        SpendStatus::Timelocked
+        | SpendStatus::Broadcast
+        | SpendStatus::Confirmed
+        | SpendStatus::Deprecated
+        | SpendStatus::Unknown => None,
+    };
+    let action = button.map(|button| {
+        row![Space::fill_width(), button]
+            .align_y(Alignment::Center)
+            .spacing(20)
+    });
+
+    column![card, action].spacing(20).into()
 }
 
 pub fn signatures<'a>(
