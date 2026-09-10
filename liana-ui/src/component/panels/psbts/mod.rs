@@ -20,7 +20,7 @@ use crate::{
     },
     spacing::{HSpacing, VSpacing},
     theme::{self, Theme},
-    widget::{Container, Element, Row, SpaceExt, Toggler},
+    widget::{Column, Container, Element, Row, SpaceExt, Toggler},
 };
 
 const PSBT_HEIGHT: u32 = 90;
@@ -128,6 +128,19 @@ pub fn list_entry<'a, M: Clone + 'static>(
     let content = row![left, spent].spacing(HSpacing::L).height(PSBT_HEIGHT);
 
     card::list_entry_with_padding(content, msg, panels::LIST_ENTRY_PADDING)
+}
+
+pub fn collapsible_section<'a, M: Clone + 'static>(
+    title: String,
+    rows: Vec<Element<'a, M>>,
+) -> Element<'a, M> {
+    let rows = Column::with_children(rows).spacing(10).padding(20);
+
+    let header = legacy::h4_bold(title).width(Length::Fill);
+
+    card::foldable::FoldableCard::new(None, header, Some(rows.into()))
+        .padding(20)
+        .into()
 }
 
 fn address_row<'a, M: Clone + 'static>(address: String, copy: M) -> Row<'a, M> {
