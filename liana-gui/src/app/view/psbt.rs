@@ -16,7 +16,7 @@ use liana::{
 use liana_ui::{
     component::{
         button::{self, btn_broadcast, btn_delete, btn_save, btn_sign},
-        card, form,
+        form,
         list::DeviceStatus,
         modal::{self, modal_view, ModalWidth},
         panels::psbts,
@@ -24,6 +24,7 @@ use liana_ui::{
         text::{self, *},
     },
     icon,
+    spacing::HSpacing,
     widget::*,
 };
 
@@ -214,39 +215,41 @@ pub fn broadcast_action<'a>(
 }
 
 pub fn delete_action<'a>(warning: Option<&Error>, deleted: bool) -> Element<'a, Message> {
-    if deleted {
-        card::simple(
-            Column::new()
-                .spacing(20)
-                .align_x(Alignment::Center)
-                .push(text(t!("psbt-delete-success")))
-                .push(button::secondary(None, t!("btn-go-back-to-psbts")).on_press(Message::Close)),
-        )
-        .align_x(iced::alignment::Horizontal::Center)
-        .width(Length::Fixed(400.0))
-        .into()
+    let content = if deleted {
+        let go_back = button::btn_go_back_to_psbts(Some(Message::Close));
+        row![Space::fill_width(), go_back, Space::fill_width(),]
     } else {
-        card::simple(
-            Column::new()
-                .spacing(10)
-                .push_maybe(warning.map(|w| warn(Some(w))))
-                .push(text(t!("psbt-delete-this")))
-                .push(
-                    Row::new()
-                        .push(Column::new().width(Length::Fill))
-                        .push(
-                            button::transparent(None, t!("btn-cancel"))
-                                .on_press(Message::Spend(SpendTxMessage::Cancel)),
-                        )
-                        .push(
-                            button::alert(None, t!("btn-delete"))
-                                .on_press(Message::Spend(SpendTxMessage::Confirm)),
-                        ),
-                ),
-        )
-        .width(Length::Fixed(400.0))
-        .into()
-    }
+        let cancel = button::btn_cancel(Some(Message::Spend(SpendTxMessage::Cancel)));
+        let delete = button::btn_delete(Some(Message::Spend(SpendTxMessage::Confirm)));
+        row![
+            Space::fill_width(),
+            cancel,
+            Space::with_width(HSpacing::XL),
+            delete,
+            Space::fill_width(),
+        ]
+    };
+
+    let warning = warning.map(|w| warn(Some(w)));
+    let message = if deleted {
+        t!("psbt-delete-success")
+    } else {
+        t!("common-are-you-sure")
+    };
+    let text = row![
+        Space::fill_width(),
+        text::new::caption(message),
+        Space::fill_width()
+    ];
+    let content = column![warning, text, Space::fill_height(), content].height(100);
+
+    modal_view(
+        Some(t!("psbt-delete-this")),
+        None,
+        None,
+        ModalWidth::S,
+        content,
+    )
 }
 
 pub fn spend_header<'a>(

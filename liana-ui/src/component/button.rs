@@ -600,6 +600,10 @@ pub fn btn_ignore<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
     btn_secondary(None, t!("btn-ignore"), BtnWidth::M, msg)
 }
 
+pub fn btn_go_back_to_psbts<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
+    btn_secondary(None, t!("btn-go-back-to-psbts"), BtnWidth::L, msg)
+}
+
 pub fn btn_email_wizardsardine<'a, T: Clone + 'a>(msg: Option<T>) -> Button<'a, T> {
     btn_primary(None, t!("btn-email-wizardsardine"), BtnWidth::Auto, msg)
 }
