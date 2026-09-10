@@ -80,7 +80,7 @@ pub fn psbt_view<'a>(
                     .push_maybe(match tx.status {
                         SpendStatus::Deprecated => Some(pill::deprecated()),
                         SpendStatus::Broadcast => Some(pill::unconfirmed()),
-                        SpendStatus::Spent => Some(pill::spent()),
+                        SpendStatus::Confirmed => Some(pill::spent()),
                         _ => None,
                     }),
             )
