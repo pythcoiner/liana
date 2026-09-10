@@ -81,7 +81,10 @@ pub fn psbt_view<'a>(
                         SpendStatus::Deprecated => Some(pill::deprecated()),
                         SpendStatus::Broadcast => Some(pill::unconfirmed()),
                         SpendStatus::Confirmed => Some(pill::spent()),
-                        _ => None,
+                        SpendStatus::Timelocked => Some(pill::timelocked()),
+                        SpendStatus::Unsigned
+                        | SpendStatus::Broadcastable
+                        | SpendStatus::Unknown => None,
                     }),
             )
             .push(spend_header(tx, labels_editing))
@@ -376,23 +379,26 @@ pub fn spend_overview_view<'a>(
             )
             .style(theme::card::simple),
         )
-        .push_maybe(if tx.status == SpendStatus::Pending {
-            Some(
+        .push_maybe(
+            match tx.status {
+                SpendStatus::Unsigned => Some(btn_sign(Some(Message::Spend(SpendTxMessage::Sign)))),
+                SpendStatus::Broadcastable => Some(btn_broadcast(Some(Message::Spend(
+                    SpendTxMessage::Broadcast,
+                )))),
+                SpendStatus::Timelocked
+                | SpendStatus::Broadcast
+                | SpendStatus::Confirmed
+                | SpendStatus::Deprecated
+                | SpendStatus::Unknown => None,
+            }
+            .map(|button| {
                 Row::new()
                     .push(Space::with_width(Length::Fill))
-                    .push_maybe(if tx.path_ready().is_none() {
-                        Some(btn_sign(Some(Message::Spend(SpendTxMessage::Sign))))
-                    } else {
-                        Some(btn_broadcast(Some(Message::Spend(
-                            SpendTxMessage::Broadcast,
-                        ))))
-                    })
+                    .push(button)
                     .align_y(Alignment::Center)
-                    .spacing(20),
-            )
-        } else {
-            None
-        })
+                    .spacing(20)
+            }),
+        )
         .into()
 }
 
@@ -402,7 +408,7 @@ pub fn signatures<'a>(
     keys_aliases: &'a HashMap<Fingerprint, String>,
 ) -> Element<'a, Message> {
     Column::new()
-        .push(if let Some(sigs) = tx.path_ready() {
+        .push(if let Some(sigs) = tx.sigs.signed_path() {
             Container::new(scrollable::horizontal_thin(
                 Row::new()
                     .spacing(5)

@@ -236,6 +236,7 @@ pills! {
     spent,          "pill-spent",        "pill-spent-tooltip",        M, simple;
     unsigned,       "pill-unsigned",     "pill-unsigned-tooltip",     M, soft_warning;
     signed,         "pill-signed",       "pill-signed-tooltip",       M, soft_warning;
+    timelocked,     "pill-timelocked",   "pill-timelocked-tooltip",   M, simple;
     unconfirmed,    "pill-unconfirmed",  "pill-unconfirmed-tooltip",  M, simple_fill;
     confirmed,      "pill-confirmed",    "pill-confirmed-tooltip",    M, success;
     key_internal,   "pill-key-internal", "pill-key-internal-tooltip", M, internal;

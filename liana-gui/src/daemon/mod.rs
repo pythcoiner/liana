@@ -258,7 +258,13 @@ pub trait Daemon: Debug {
                 .cloned()
                 .collect();
 
-            let status = model::spend_status_from_coins(&tx.psbt, &coins);
+            let status = model::spend_status_or_from_coins(
+                tx.status,
+                &tx.psbt,
+                &coins,
+                &info.descriptors.main,
+                info.block_height,
+            );
             spend_txs.push(model::SpendTx::new(
                 tx.updated_at,
                 tx.psbt,
