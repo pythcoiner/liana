@@ -550,32 +550,25 @@ pub fn inputs_view<'a>(
     labels: &'a HashMap<String, String>,
     labels_editing: &'a HashMap<String, form::Value<String>>,
 ) -> Element<'a, Message> {
-    Container::new(
-        Collapse::new(
-            Row::new()
-                .align_y(Alignment::Center)
-                .push(h4_bold(t!("psbt-coins-spent", count = tx.input.len())).width(Length::Fill))
-                .push(icon::collapse_icon()),
-            Row::new()
-                .align_y(Alignment::Center)
-                .push(h4_bold(t!("psbt-coins-spent", count = tx.input.len())).width(Length::Fill))
-                .push(icon::collapsed_icon()),
-            tx.input.iter().fold(
-                Column::new().spacing(10).padding(20),
-                |col: Column<'a, Message>, input| {
-                    col.push(input_view(
-                        &input.previous_output,
-                        coins.get(&input.previous_output),
-                        labels,
-                        labels_editing,
-                    ))
-                },
-            ),
-        )
-        .padding(20),
-    )
-    .style(theme::card::button_simple)
-    .into()
+    let title = t!("psbt-coins-spent", count = tx.input.len());
+
+    let inputs = tx.input.iter().fold(
+        Column::new().spacing(10).padding(20),
+        |col: Column<'a, Message>, input| {
+            col.push(input_view(
+                &input.previous_output,
+                coins.get(&input.previous_output),
+                labels,
+                labels_editing,
+            ))
+        },
+    );
+
+    let header = h4_bold(title).width(Length::Fill);
+
+    card::foldable::FoldableCard::new(None, header, Some(inputs.into()))
+        .padding(20)
+        .into()
 }
 
 pub fn outputs_view<'a>(
