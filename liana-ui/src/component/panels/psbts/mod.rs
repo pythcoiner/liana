@@ -295,3 +295,60 @@ pub fn path_row<'a, M: 'static>(
 
     scrollable::horizontal_thin(content).into()
 }
+
+fn not_ready_status<'a, M: 'static>() -> Row<'a, M> {
+    let status = row![
+        icon::circle_cross_icon().style(theme::text::error),
+        legacy::text(t!("psbt-not-ready")).style(theme::text::error)
+    ]
+    .spacing(5)
+    .align_y(Alignment::Center)
+    .width(Length::Fill);
+
+    row![new::b5_bold(t!("psbt-status")), status]
+        .align_y(Alignment::Center)
+        .spacing(20)
+}
+
+/// Signature status of a psbt that can be broadcast, with the keys that signed it.
+pub fn signatures_ready<'a, M: 'static>(
+    sigs: &'a PathSpendInfo,
+    key_aliases: &'a HashMap<Fingerprint, String>,
+) -> Element<'a, M> {
+    let signers = sigs
+        .signed_pubkeys
+        .keys()
+        .fold(Row::new().spacing(5), |row, fg| {
+            row.push(pill::fingerprint(
+                fg.to_string(),
+                key_aliases.get(fg).map(String::as_str),
+            ))
+        });
+
+    let ready = row![
+        new::b5_bold(t!("psbt-status")),
+        icon::circle_check_icon().style(theme::text::success),
+        new::b5_bold(t!("common-ready")).style(theme::text::success),
+        legacy::text(t!("psbt-signed-by")),
+        signers
+    ]
+    .align_y(Alignment::Center)
+    .spacing(10);
+
+    Container::new(scrollable::horizontal_thin(ready))
+        .padding(15)
+        .into()
+}
+
+/// Signature status of a psbt that still misses signatures, folding what it requires.
+pub fn signatures_missing<'a, M: Clone + 'static>(
+    requirement: Option<Element<'a, M>>,
+) -> Element<'a, M> {
+    let content = column![legacy::text(t!("psbt-finalizing-requires")), requirement]
+        .padding(15)
+        .spacing(10);
+
+    card::foldable::FoldableCard::new(None, not_ready_status(), Some(content.into()))
+        .padding(15)
+        .into()
+}
