@@ -19,7 +19,7 @@ use crate::{
     },
     spacing::{HSpacing, VSpacing},
     theme::{self, Theme},
-    widget::{Container, Element, SpaceExt},
+    widget::{Container, Element, SpaceExt, Toggler},
 };
 
 const PSBT_HEIGHT: u32 = 90;
@@ -40,6 +40,19 @@ pub fn status_pill<'a, M: 'a>(status: SpendStatus) -> Option<Container<'a, M>> {
         SpendStatus::Deprecated => Some(pill::deprecated().width(PillWidth::SM)),
         SpendStatus::Unknown => None,
     }
+}
+
+pub fn hide_confirmed_row<'a, M: Clone + 'static>(hidden: bool, toggle: M) -> Element<'a, M> {
+    let label = new::b4_medium(t!("psbts-hide-confirmed"));
+    let toggler = Toggler::new(hidden)
+        .on_toggle(move |_| toggle.clone())
+        .size(28)
+        .style(theme::toggler::primary);
+
+    row![label, toggler, Space::fill_width()]
+        .spacing(HSpacing::M)
+        .align_y(Alignment::Center)
+        .into()
 }
 
 #[allow(clippy::too_many_arguments)]
