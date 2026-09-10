@@ -567,6 +567,8 @@ common-and => "and"
 
 common-approx-feerate-value => "(~{$rate} sats/vbyte)"
 
+common-are-you-sure => "Are you sure?"
+
 common-blocks => "blocks"
 
 common-connecting-ellipsis => "Connecting..."
