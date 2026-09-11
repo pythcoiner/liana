@@ -9,11 +9,11 @@ use liana_ui::{
     component::{
         address::address as address_view,
         amount::amount,
-        badge, button, form, pill,
+        badge, button, card, form, pill,
         text::{legacy, new, Text as _},
     },
     icon, theme,
-    widget::{Button, Column, Container, Element, SpaceExt},
+    widget::{Column, Container, Element, SpaceExt},
 };
 
 use crate::{
@@ -65,7 +65,7 @@ fn coin_list_view<'a>(
     expanded: bool,
     labels: &'a HashMap<String, String>,
     labels_editing: &'a HashMap<String, form::Value<String>>,
-) -> Container<'a, Message> {
+) -> Element<'a, Message> {
     let outpoint = coin.outpoint.to_string();
     let address = coin.address.to_string();
     let txid = coin.outpoint.txid.to_string();
@@ -98,16 +98,11 @@ fn coin_list_view<'a>(
         .spacing(10)
         .align_y(Alignment::Center)
         .width(Length::Fill);
-    let header = Button::new(
-        row![summary, amount(&coin.amount)]
-            .align_y(Alignment::Center)
-            .spacing(20),
-    )
-    .style(theme::button::transparent_border)
-    .padding(10)
-    .on_press(Message::Select(index));
+    let header = row![summary, amount(&coin.amount)]
+        .align_y(Alignment::Center)
+        .spacing(20);
 
-    let details = expanded.then(|| {
+    let details = {
         let label_editor = if let Some(label) = labels_editing.get(&outpoint) {
             label::label_editing(vec![outpoint.clone()], label, legacy::P1_SIZE)
         } else {
@@ -230,9 +225,13 @@ fn coin_list_view<'a>(
         column![label_editor, recovery, coin_info, spend]
             .padding(10)
             .spacing(5)
-    });
+    };
 
-    Container::new(column![header, details]).style(theme::card::button_simple)
+    card::foldable::FoldableCard::new(None, header, Some(details.into()))
+        .expanded(expanded)
+        .on_toggle(move || Message::Select(index))
+        .padding(card::CardPadding::Soft)
+        .into()
 }
 
 /// returns y,m,d
