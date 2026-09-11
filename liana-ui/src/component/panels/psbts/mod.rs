@@ -296,21 +296,6 @@ pub fn path_row<'a, M: 'static>(
     scrollable::horizontal_thin(content).into()
 }
 
-fn not_ready_status<'a, M: 'static>() -> Row<'a, M> {
-    let status = row![
-        icon::circle_cross_icon().style(theme::text::error),
-        legacy::text(t!("psbt-not-ready")).style(theme::text::error)
-    ]
-    .spacing(5)
-    .align_y(Alignment::Center)
-    .width(Length::Fill);
-
-    row![new::b5_bold(t!("psbt-status")), status]
-        .align_y(Alignment::Center)
-        .spacing(20)
-}
-
-/// Signature status of a psbt that can be broadcast, with the keys that signed it.
 pub fn signatures_ready<'a, M: 'static>(
     sigs: &'a PathSpendInfo,
     key_aliases: &'a HashMap<Fingerprint, String>,
@@ -335,21 +320,29 @@ pub fn signatures_ready<'a, M: 'static>(
     .align_y(Alignment::Center)
     .spacing(10);
 
-    Container::new(scrollable::horizontal_thin(ready))
-        .padding(15)
+    scrollable::horizontal_thin(ready).into()
+}
+
+pub fn signatures_missing<'a, M: 'static>() -> Element<'a, M> {
+    let status = row![
+        icon::circle_cross_icon().style(theme::text::error),
+        legacy::text(t!("psbt-not-ready")).style(theme::text::error)
+    ]
+    .spacing(5)
+    .align_y(Alignment::Center)
+    .width(Length::Fill);
+    row![new::b5_bold(t!("psbt-status")), status]
+        .align_y(Alignment::Center)
+        .spacing(20)
         .into()
 }
 
-/// Signature status of a psbt that still misses signatures, folding what it requires.
-pub fn signatures_missing<'a, M: Clone + 'static>(
+pub fn signatures_requirement<'a, M: 'static>(
     requirement: Option<Element<'a, M>>,
 ) -> Element<'a, M> {
-    let content = column![legacy::text(t!("psbt-finalizing-requires")), requirement]
+    column![legacy::text(t!("psbt-finalizing-requires")), requirement]
         .padding(15)
-        .spacing(10);
-
-    card::foldable::FoldableCard::new(None, not_ready_status(), Some(content.into()))
-        .padding(15)
+        .spacing(10)
         .into()
 }
 
@@ -395,7 +388,8 @@ pub fn spend_overview<'a, M: Clone + 'static>(
     import: Option<M>,
     txid: String,
     copy_txid: M,
-    signatures: Element<'a, M>,
+    status: Element<'a, M>,
+    details: Option<Element<'a, M>>,
     action: Option<Element<'a, M>>,
 ) -> Element<'a, M> {
     let export_button = button::btn_export_psbt(saved, export);
@@ -413,9 +407,9 @@ pub fn spend_overview<'a, M: Clone + 'static>(
     ]
     .align_y(Alignment::Center);
 
-    let psbt = column![header, txid].padding(15).spacing(10);
-    let card =
-        Container::new(column![psbt, signatures, Space::with_height(5)]).style(theme::card::simple);
+    let psbt = column![header, txid].spacing(10);
+    let card = card::foldable::FoldableCard::new(Some(psbt.into()), status, details)
+        .padding(card::CardPadding::Soft);
 
     let action = action.map(|action| {
         row![Space::fill_width(), action]
