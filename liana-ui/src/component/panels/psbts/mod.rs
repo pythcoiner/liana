@@ -22,7 +22,7 @@ use crate::{
         },
         pill::{self, PillWidth},
         scrollable,
-        text::{legacy, new, truncate, Text as _},
+        text::{new, truncate},
     },
     icon,
     spacing::{HSpacing, VSpacing},
@@ -143,7 +143,7 @@ pub fn collapsible_section<'a, M: Clone + 'static>(
 ) -> Element<'a, M> {
     let rows = Column::with_children(rows).spacing(10).padding(20);
 
-    let header = legacy::h4_bold(title).width(Length::Fill);
+    let header = new::h3_semi(title).width(Length::Fill);
 
     card::foldable::FoldableCard::new(None, header, Some(rows.into()))
         .padding(20)
@@ -163,7 +163,7 @@ fn address_label_row<'a, M: 'a>(label: &'a str) -> Row<'a, M> {
     let title = new::b5_bold(t!("coins-address-label")).style(theme::text::secondary);
     row![
         title,
-        legacy::p2_regular(label).style(theme::text::secondary)
+        new::small_caption(label).style(theme::text::secondary)
     ]
     .align_y(Alignment::Center)
     .width(Length::Fill)
@@ -203,7 +203,7 @@ pub fn input_row<'a, M: Clone + 'static>(
     let title = new::b5_bold(t!("coins-outpoint")).style(theme::text::secondary);
     let outpoint = row![
         title,
-        legacy::p2_regular(outpoint).style(theme::text::secondary),
+        new::small_caption(outpoint).style(theme::text::secondary),
         button::btn_copy(Some(copy_outpoint))
     ]
     .align_y(Alignment::Center)
@@ -314,7 +314,7 @@ pub fn signatures_ready<'a, M: 'static>(
         new::b5_bold(t!("psbt-status")),
         icon::circle_check_icon().style(theme::text::success),
         new::b5_bold(t!("common-ready")).style(theme::text::success),
-        legacy::text(t!("psbt-signed-by")),
+        new::caption(t!("psbt-signed-by")),
         signers
     ]
     .align_y(Alignment::Center)
@@ -326,7 +326,7 @@ pub fn signatures_ready<'a, M: 'static>(
 pub fn signatures_missing<'a, M: 'static>() -> Element<'a, M> {
     let status = row![
         icon::circle_cross_icon().style(theme::text::error),
-        legacy::text(t!("psbt-not-ready")).style(theme::text::error)
+        new::caption(t!("psbt-not-ready")).style(theme::text::error)
     ]
     .spacing(5)
     .align_y(Alignment::Center)
@@ -340,7 +340,7 @@ pub fn signatures_missing<'a, M: 'static>() -> Element<'a, M> {
 pub fn signatures_requirement<'a, M: 'static>(
     requirement: Option<Element<'a, M>>,
 ) -> Element<'a, M> {
-    column![legacy::text(t!("psbt-finalizing-requires")), requirement]
+    column![new::caption(t!("psbt-finalizing-requires")), requirement]
         .padding(15)
         .spacing(10)
         .into()
@@ -354,26 +354,24 @@ pub fn spend_header<'a, M: 'static>(
     feerate: Option<u64>,
 ) -> Element<'a, M> {
     let spent: Element<'a, M> = if is_send_to_self {
-        legacy::h1(t!("common-self-transfer")).into()
+        new::d2(t!("common-self-transfer")).into()
     } else {
-        amount_with_font(&spent, legacy::H1_SPEC).into()
+        amount_with_font(&spent, new::D2_SPEC).into()
     };
     let spent = Container::new(spent);
 
     let missing_inputs = fee
         .is_none()
-        .then_some(legacy::text(t!("psbt-missing-inputs")));
-    let fee = fee.map(|fee| amount_with_font(&fee, legacy::H3_SPEC));
+        .then_some(new::caption(t!("psbt-missing-inputs")));
+    let fee = fee.map(|fee| amount_with_font(&fee, new::H1_SPEC));
     let feerate = feerate.map(|rate| {
-        legacy::text(t!("common-approx-feerate-value", rate = rate))
-            .size(legacy::H4_SIZE)
-            .style(theme::text::secondary)
+        new::h3(t!("common-approx-feerate-value", rate = rate)).style(theme::text::secondary)
     });
     let fees = row![
-        legacy::h3(t!("transactions-miner-fee")).style(theme::text::secondary),
+        new::h1(t!("transactions-miner-fee")).style(theme::text::secondary),
         missing_inputs,
         fee,
-        legacy::text(" ").size(legacy::H3_SIZE),
+        new::h1(" "),
         feerate
     ]
     .align_y(Alignment::Center);
@@ -394,15 +392,12 @@ pub fn spend_overview<'a, M: Clone + 'static>(
 ) -> Element<'a, M> {
     let export_button = button::btn_export_psbt(saved, export);
     let buttons = row![export_button, button::btn_import(import)].spacing(5);
-    let header = row![
-        legacy::text(t!("psbt-title")).bold().width(Length::Fill),
-        buttons
-    ]
-    .align_y(Alignment::Center);
+    let header = row![new::b5_bold(t!("psbt-title")).width(Length::Fill), buttons]
+        .align_y(Alignment::Center);
 
     let txid = row![
         new::b5_bold(t!("transactions-txid")).width(Length::Fill),
-        legacy::p2_regular(txid).style(theme::text::secondary),
+        new::small_caption(txid).style(theme::text::secondary),
         button::btn_copy(Some(copy_txid))
     ]
     .align_y(Alignment::Center);
