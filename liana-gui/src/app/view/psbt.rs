@@ -25,7 +25,7 @@ use liana_ui::{
         text::new,
     },
     icon,
-    spacing::HSpacing,
+    spacing::{HSpacing, VSpacing},
     widget::{Column, Container, Element, SpaceExt},
 };
 
@@ -67,7 +67,7 @@ pub fn psbt_view<'a>(
         status
     ]
     .align_y(Alignment::Center)
-    .spacing(10);
+    .spacing(HSpacing::M);
 
     let inputs = inputs_view(&tx.coins, &tx.psbt.unsigned_tx, &tx.labels, labels_editing);
     let outputs = outputs_view(
@@ -92,11 +92,11 @@ pub fn psbt_view<'a>(
         header,
         spend_header(tx, labels_editing),
         spend_overview_view(tx, desc_info, key_aliases, currently_signing, saved),
-        column![inputs, outputs].spacing(20),
+        column![inputs, outputs].spacing(VSpacing::L),
         action,
-        Space::with_height(10)
+        Space::with_height(VSpacing::S)
     ]
-    .spacing(20);
+    .spacing(VSpacing::L);
 
     dashboard(&Menu::PSBTs, cache, warning, content)
 }
@@ -109,14 +109,14 @@ pub fn save_action<'a>(warning: Option<&Error>, saved: bool) -> Element<'a, Mess
     } else {
         let ignore = button::btn_ignore(Some(Message::Close));
         let save = button::btn_save(Some(Message::Spend(SpendTxMessage::Confirm)), true);
-        let buttons = row![Space::fill_width(), ignore, save].spacing(10);
+        let buttons = row![Space::fill_width(), ignore, save].spacing(HSpacing::M);
 
         column![
             warning.map(|w| warn(Some(w))),
             new::caption(t!("psbt-save-transaction")),
             buttons
         ]
-        .spacing(10)
+        .spacing(VSpacing::S)
         .into()
     };
 
@@ -151,20 +151,21 @@ pub fn broadcast_action<'a>(
             )
         };
 
-        let warning = row![icon::warning_icon(), new::caption(invalidates)].spacing(10);
+        let warning = row![icon::warning_icon(), new::caption(invalidates)].spacing(HSpacing::M);
         let explanation = row![new::caption(conflicts)].padding(CONFLICT_INDENT);
 
-        conflicting_txids
-            .iter()
-            .fold(column![warning, explanation].spacing(5), |col, txid| {
+        conflicting_txids.iter().fold(
+            column![warning, explanation].spacing(VSpacing::XS),
+            |col, txid| {
                 let copy = button::btn_copy(Some(Message::Clipboard(txid.to_string())));
                 col.push(
                     row![new::caption(txid.to_string()), copy]
                         .padding(CONFLICT_INDENT)
-                        .spacing(5)
+                        .spacing(HSpacing::S)
                         .align_y(Alignment::Center),
                 )
-            })
+            },
+        )
     });
 
     let confirm = row![
@@ -178,7 +179,7 @@ pub fn broadcast_action<'a>(
         conflicts,
         confirm
     ]
-    .spacing(10);
+    .spacing(VSpacing::S);
 
     let width = if conflicting_txids.is_empty() {
         ModalWidth::S
@@ -389,7 +390,7 @@ pub fn outputs_view<'a>(
         psbts::collapsible_section(t!("psbt-change"), rows)
     });
 
-    column![payments, change].spacing(20).into()
+    column![payments, change].spacing(VSpacing::L).into()
 }
 
 fn input_view<'a>(
@@ -541,7 +542,7 @@ pub fn sign_action<'a>(
 
     let signers = Column::from_vec(signers)
         .align_x(Alignment::Center)
-        .spacing(10)
+        .spacing(VSpacing::S)
         .width(Length::Fill);
 
     let modal_width = ModalWidth::L;
@@ -549,7 +550,7 @@ pub fn sign_action<'a>(
     let warning = warning.map(|w| warn(Some(w)));
 
     column![warning, content]
-        .spacing(10)
+        .spacing(VSpacing::S)
         .width(modal_width as u32 + 50)
         .into()
 }
