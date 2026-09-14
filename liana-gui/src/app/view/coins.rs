@@ -7,10 +7,8 @@ use iced::{
 
 use liana_ui::{
     component::{
-        address::address as address_view,
-        amount::amount,
-        badge, button, card, form, pill,
-        text::{legacy, new, Text as _},
+        address::address as address_view, amount::amount, badge, button, card, form, pill,
+        text::new,
     },
     icon, theme,
     widget::{Column, Container, Element, SpaceExt},
@@ -26,6 +24,8 @@ use crate::{
     t,
 };
 
+const LABEL_BODY_SIZE: u32 = 16;
+
 pub fn coins_view<'a>(
     cache: &Cache,
     coins: &'a [Coin],
@@ -34,7 +34,7 @@ pub fn coins_view<'a>(
     labels: &'a HashMap<String, String>,
     labels_editing: &'a HashMap<String, form::Value<String>>,
 ) -> Element<'a, Message> {
-    let title = Container::new(legacy::panel_title(Menu::Coins.title())).width(Length::Fill);
+    let title = Container::new(new::d2(Menu::Coins.title())).width(Length::Fill);
 
     let list = coins
         .iter()
@@ -104,12 +104,12 @@ fn coin_list_view<'a>(
 
     let details = {
         let label_editor = if let Some(label) = labels_editing.get(&outpoint) {
-            label::label_editing(vec![outpoint.clone()], label, legacy::P1_SIZE)
+            label::label_editing(vec![outpoint.clone()], label, LABEL_BODY_SIZE)
         } else {
             label::label_editable(
                 vec![outpoint.clone()],
                 labels.get(&outpoint),
-                legacy::P1_SIZE,
+                LABEL_BODY_SIZE,
             )
         };
         let label_editor = Container::new(label_editor).width(Length::Fill);
@@ -126,10 +126,8 @@ fn coin_list_view<'a>(
         };
 
         let address_label = row![
-            legacy::p2_regular(t!("coins-address-label"))
-                .bold()
-                .style(theme::text::secondary),
-            legacy::p2_regular(
+            new::b5_bold(t!("coins-address-label")).style(theme::text::secondary),
+            new::small_caption(
                 labels
                     .get(&address)
                     .cloned()
@@ -141,18 +139,14 @@ fn coin_list_view<'a>(
         .spacing(5);
         let copy_address = button::btn_copy(Some(Message::Clipboard(address.clone())));
         let address = row![
-            legacy::p2_regular(t!("common-address-label"))
-                .bold()
-                .style(theme::text::secondary),
+            new::b5_bold(t!("common-address-label")).style(theme::text::secondary),
             row![address_view(address), copy_address].align_y(Alignment::Center)
         ]
         .align_y(Alignment::Center)
         .spacing(5);
         let deposit = row![
-            legacy::p2_regular(t!("coins-deposit-transaction-label"))
-                .bold()
-                .style(theme::text::secondary),
-            legacy::p2_regular(
+            new::b5_bold(t!("coins-deposit-transaction-label")).style(theme::text::secondary),
+            new::small_caption(
                 labels
                     .get(&txid)
                     .cloned()
@@ -164,11 +158,9 @@ fn coin_list_view<'a>(
         .spacing(5);
         let copy_outpoint = button::btn_copy(Some(Message::Clipboard(outpoint.clone())));
         let outpoint_row = row![
-            legacy::p2_regular(t!("coins-outpoint"))
-                .bold()
-                .style(theme::text::secondary),
+            new::b5_bold(t!("coins-outpoint")).style(theme::text::secondary),
             row![
-                legacy::p2_regular(outpoint).style(theme::text::secondary),
+                new::small_caption(outpoint).style(theme::text::secondary),
                 copy_outpoint
             ]
             .align_y(Alignment::Center)
@@ -177,10 +169,8 @@ fn coin_list_view<'a>(
         .spacing(5);
         let block_height = coin.block_height.map(|b| {
             row![
-                legacy::p2_regular(t!("coins-block-height"))
-                    .bold()
-                    .style(theme::text::secondary),
-                legacy::p2_regular(b.to_string()).style(theme::text::secondary)
+                new::b5_bold(t!("coins-block-height")).style(theme::text::secondary),
+                new::small_caption(b.to_string()).style(theme::text::secondary)
             ]
             .spacing(5)
         });
@@ -189,23 +179,19 @@ fn coin_list_view<'a>(
         let spend = match coin.spend_info {
             Some(info) => {
                 let spend_txid = row![
-                    legacy::p2_regular(t!("coins-spend-txid"))
-                        .bold()
-                        .style(theme::text::secondary),
-                    legacy::p2_regular(info.txid.to_string())
+                    new::b5_bold(t!("coins-spend-txid")).style(theme::text::secondary),
+                    new::small_caption(info.txid.to_string())
                 ]
                 .spacing(5);
                 let spend_height = match info.height {
                     Some(height) => row![
-                        legacy::p2_regular(t!("coins-spend-block-height"))
-                            .bold()
-                            .style(theme::text::secondary),
-                        legacy::p2_regular(height.to_string())
+                        new::b5_bold(t!("coins-spend-block-height")).style(theme::text::secondary),
+                        new::small_caption(height.to_string())
                     ]
                     .spacing(5),
-                    None => row![legacy::p2_regular(t!("coins-not-in-block"))
-                        .bold()
-                        .style(theme::text::secondary)],
+                    None => {
+                        row![new::b5_bold(t!("coins-not-in-block")).style(theme::text::secondary)]
+                    }
                 };
                 column![spend_txid, spend_height].spacing(5)
             }
