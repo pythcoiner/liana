@@ -588,7 +588,7 @@ pub fn outputs_view<'a>(
         .filter(|(i, _)| is_payment(i))
         .count();
 
-    let payments: Element<'a, Message> = if count > 0 {
+    let payments: Option<Element<'a, Message>> = (count > 0).then_some({
         let title = t!("psbt-payments", count = count);
         let rows: Column<'a, Message> = tx
             .output
@@ -613,16 +613,7 @@ pub fn outputs_view<'a>(
         card::foldable::FoldableCard::new(None, header, Some(rows.into()))
             .padding(20)
             .into()
-    } else {
-        Container::new(
-            h4_bold(t!("psbt-no-payment"))
-                .style(|t| theme::text::custom(t.colors.buttons.transparent_border.active.text)),
-        )
-        .padding(20)
-        .width(Length::Fill)
-        .style(theme::card::button_simple)
-        .into()
-    };
+    });
 
     let change = (!is_external && !change_indexes.is_empty()).then(|| -> Element<'a, Message> {
         let rows: Column<'a, Message> = tx
