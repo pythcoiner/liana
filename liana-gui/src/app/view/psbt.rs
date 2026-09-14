@@ -22,7 +22,7 @@ use liana_ui::{
         notification,
         panels::psbts,
         pill,
-        text::{legacy, new},
+        text::new,
     },
     icon,
     spacing::HSpacing,
@@ -42,6 +42,11 @@ use crate::{
     view::hw::{device_list_entry, HwRowMode},
 };
 
+const LABEL_TITLE_SIZE: u32 = 24;
+const LABEL_BODY_SIZE: u32 = 16;
+/// Indent of the conflicting transactions listed under the broadcast warning.
+const CONFLICT_INDENT: [u16; 2] = [0 /* Top/Bottom */, 30 /* Left/Right */];
+
 #[allow(clippy::too_many_arguments)]
 pub fn psbt_view<'a>(
     cache: &'a Cache,
@@ -57,7 +62,7 @@ pub fn psbt_view<'a>(
     let recovery = (!tx.sigs.recovery_paths().is_empty()).then_some(pill::recovery());
     let status = psbts::status_pill(tx.status);
     let header = row![
-        Container::new(legacy::h3(t!("psbt-title"))).width(Length::Fill),
+        Container::new(new::h1(t!("psbt-title"))).width(Length::Fill),
         recovery,
         status
     ]
@@ -98,7 +103,7 @@ pub fn psbt_view<'a>(
 
 pub fn save_action<'a>(warning: Option<&Error>, saved: bool) -> Element<'a, Message> {
     let content: Element<'a, Message> = if saved {
-        Container::new(legacy::text(t!("psbt-transaction-saved")))
+        Container::new(new::caption(t!("psbt-transaction-saved")))
             .align_x(iced::alignment::Horizontal::Center)
             .into()
     } else {
@@ -108,7 +113,7 @@ pub fn save_action<'a>(warning: Option<&Error>, saved: bool) -> Element<'a, Mess
 
         column![
             warning.map(|w| warn(Some(w))),
-            legacy::text(t!("psbt-save-transaction")),
+            new::caption(t!("psbt-save-transaction")),
             buttons
         ]
         .spacing(10)
@@ -128,7 +133,7 @@ pub fn broadcast_action<'a>(
     saved: bool,
 ) -> Element<'a, Message> {
     if saved {
-        let content = Container::new(legacy::text(t!("psbt-transaction-broadcast")))
+        let content = Container::new(new::caption(t!("psbt-transaction-broadcast")))
             .align_x(iced::alignment::Horizontal::Center);
         return modal_view(None::<String>, None, None, ModalWidth::S, content);
     }
@@ -146,16 +151,16 @@ pub fn broadcast_action<'a>(
             )
         };
 
-        let warning = row![icon::warning_icon(), legacy::text(invalidates)].spacing(10);
-        let explanation = row![legacy::text(conflicts)].padding([0, 30]);
+        let warning = row![icon::warning_icon(), new::caption(invalidates)].spacing(10);
+        let explanation = row![new::caption(conflicts)].padding(CONFLICT_INDENT);
 
         conflicting_txids
             .iter()
             .fold(column![warning, explanation].spacing(5), |col, txid| {
                 let copy = button::btn_copy(Some(Message::Clipboard(txid.to_string())));
                 col.push(
-                    row![legacy::text(txid.to_string()), copy]
-                        .padding([0, 30])
+                    row![new::caption(txid.to_string()), copy]
+                        .padding(CONFLICT_INDENT)
                         .spacing(5)
                         .align_y(Alignment::Center),
                 )
@@ -169,7 +174,7 @@ pub fn broadcast_action<'a>(
 
     let content = column![
         warning.map(|w| warn(Some(w))),
-        Container::new(legacy::h4_bold(t!("psbt-broadcast-transaction"))).width(Length::Fill),
+        Container::new(new::h3_semi(t!("psbt-broadcast-transaction"))).width(Length::Fill),
         conflicts,
         confirm
     ]
@@ -232,14 +237,14 @@ pub fn spend_header<'a>(
         let outpoint = outpoint.to_string();
         let labelled = vec![outpoint.clone(), txid.clone()];
         if let Some(label) = labels_editing.get(&outpoint) {
-            label::label_editing(labelled, label, legacy::H3_SIZE)
+            label::label_editing(labelled, label, LABEL_TITLE_SIZE)
         } else {
-            label::label_editable(labelled, tx.labels.get(&outpoint), legacy::H3_SIZE)
+            label::label_editable(labelled, tx.labels.get(&outpoint), LABEL_TITLE_SIZE)
         }
     } else if let Some(label) = labels_editing.get(&txid) {
-        label::label_editing(vec![txid.clone()], label, legacy::H3_SIZE)
+        label::label_editing(vec![txid.clone()], label, LABEL_TITLE_SIZE)
     } else {
-        label::label_editable(vec![txid.clone()], tx.labels.get(&txid), legacy::H3_SIZE)
+        label::label_editable(vec![txid.clone()], tx.labels.get(&txid), LABEL_TITLE_SIZE)
     };
 
     psbts::spend_header(
@@ -396,12 +401,12 @@ fn input_view<'a>(
     let outpoint = outpoint.to_string();
 
     let label_widget = if let Some(label) = labels_editing.get(&outpoint) {
-        label::label_editing(vec![outpoint.clone()], label, legacy::P1_SIZE)
+        label::label_editing(vec![outpoint.clone()], label, LABEL_BODY_SIZE)
     } else {
         label::label_editable(
             vec![outpoint.clone()],
             labels.get(&outpoint),
-            legacy::P1_SIZE,
+            LABEL_BODY_SIZE,
         )
     };
 
@@ -450,12 +455,12 @@ fn payment_view<'a>(
 
     let label_widget = if is_editable {
         if let Some(label) = labels_editing.get(&outpoint) {
-            label::label_editing(change_labels, label, legacy::P1_SIZE)
+            label::label_editing(change_labels, label, LABEL_BODY_SIZE)
         } else {
-            label::label_editable(change_labels, labels.get(&outpoint), legacy::P1_SIZE)
+            label::label_editable(change_labels, labels.get(&outpoint), LABEL_BODY_SIZE)
         }
     } else {
-        label::label_non_editable(change_labels, None, legacy::P1_SIZE)
+        label::label_non_editable(change_labels, None, LABEL_BODY_SIZE)
     };
 
     let address_label = addr
