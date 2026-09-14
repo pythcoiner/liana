@@ -7,6 +7,7 @@ pub enum VSpacing {
     M = 16,
     L = 20,
     XL = 24,
+    XXL = 30,
 }
 
 impl VSpacing {

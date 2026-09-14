@@ -141,12 +141,14 @@ pub fn collapsible_section<'a, M: Clone + 'static>(
     title: String,
     rows: Vec<Element<'a, M>>,
 ) -> Element<'a, M> {
-    let rows = Column::with_children(rows).spacing(10).padding(20);
+    let rows = Column::with_children(rows)
+        .spacing(VSpacing::S)
+        .padding(card::CardPadding::Soft);
 
     let header = new::h3_semi(title).width(Length::Fill);
 
     card::foldable::FoldableCard::new(None, header, Some(rows.into()))
-        .padding(20)
+        .padding(card::CardPadding::Soft)
         .into()
 }
 
@@ -156,7 +158,7 @@ fn address_row<'a, M: Clone + 'static>(address: String, copy: M) -> Row<'a, M> {
     row![title, address_view(address), copy]
         .align_y(Alignment::Center)
         .width(Length::Fill)
-        .spacing(5)
+        .spacing(HSpacing::S)
 }
 
 fn address_label_row<'a, M: 'a>(label: &'a str) -> Row<'a, M> {
@@ -167,7 +169,7 @@ fn address_label_row<'a, M: 'a>(label: &'a str) -> Row<'a, M> {
     ]
     .align_y(Alignment::Center)
     .width(Length::Fill)
-    .spacing(5)
+    .spacing(HSpacing::S)
 }
 
 pub fn change_row<'a, M: Clone + 'static>(
@@ -179,7 +181,7 @@ pub fn change_row<'a, M: Clone + 'static>(
 
     column![value, address_row(address, copy)]
         .width(Length::Fill)
-        .spacing(5)
+        .spacing(VSpacing::XS)
         .into()
 }
 
@@ -197,7 +199,7 @@ pub fn input_row<'a, M: Clone + 'static>(
         Container::new(label).width(Length::Fill),
         value.map(|value| amount(&value))
     ]
-    .spacing(5)
+    .spacing(HSpacing::S)
     .align_y(Alignment::Center);
 
     let title = new::b5_bold(t!("coins-outpoint")).style(theme::text::secondary);
@@ -207,7 +209,7 @@ pub fn input_row<'a, M: Clone + 'static>(
         button::btn_copy(Some(copy_outpoint))
     ]
     .align_y(Alignment::Center)
-    .spacing(5);
+    .spacing(HSpacing::S);
 
     let address = address
         .zip(copy_address)
@@ -216,7 +218,7 @@ pub fn input_row<'a, M: Clone + 'static>(
 
     column![header, details]
         .width(Length::Fill)
-        .spacing(5)
+        .spacing(VSpacing::XS)
         .into()
 }
 
@@ -228,7 +230,7 @@ pub fn payment_row<'a, M: Clone + 'static>(
     copy_address: Option<M>,
 ) -> Element<'a, M> {
     let header = row![Container::new(label).width(Length::Fill), amount(&value)]
-        .spacing(5)
+        .spacing(HSpacing::S)
         .align_y(Alignment::Center);
 
     let address = address.zip(copy_address).map(|(address, copy)| {
@@ -240,7 +242,7 @@ pub fn payment_row<'a, M: Clone + 'static>(
 
     column![header, address]
         .width(Length::Fill)
-        .spacing(5)
+        .spacing(VSpacing::XS)
         .into()
 }
 
@@ -261,17 +263,18 @@ pub fn path_row<'a, M: 'static>(
     let missing_signatures = sigs.threshold.saturating_sub(sigs.sigs_count);
 
     // From these iterators, create the appropriate rows to be displayed.
-    let row_unsigned = non_signed_fgs
-        .into_iter()
-        .fold(Row::new().spacing(5), |row, fg| {
-            row.push(pill::fingerprint(
-                fg.to_string(),
-                key_aliases.get(&fg).map(String::as_str),
-            ))
-        });
+    let row_unsigned =
+        non_signed_fgs
+            .into_iter()
+            .fold(Row::new().spacing(HSpacing::S), |row, fg| {
+                row.push(pill::fingerprint(
+                    fg.to_string(),
+                    key_aliases.get(&fg).map(String::as_str),
+                ))
+            });
     let row_signed = signed_fgs
         .into_iter()
-        .fold(Row::new().spacing(5), |row, fg| {
+        .fold(Row::new().spacing(HSpacing::S), |row, fg| {
             row.push(pill::fingerprint(
                 fg.to_string(),
                 key_aliases.get(fg).map(String::as_str),
@@ -283,7 +286,7 @@ pub fn path_row<'a, M: 'static>(
     } else {
         icon::circle_cross_icon().style(theme::text::secondary)
     };
-    let status = row![status, Space::with_width(20)];
+    let status = row![status, Space::with_width(HSpacing::XL)];
 
     let missing = new::caption(t!("psbt-more-signatures", count = missing_signatures))
         .style(theme::text::secondary);
@@ -303,7 +306,7 @@ pub fn signatures_ready<'a, M: 'static>(
     let signers = sigs
         .signed_pubkeys
         .keys()
-        .fold(Row::new().spacing(5), |row, fg| {
+        .fold(Row::new().spacing(HSpacing::S), |row, fg| {
             row.push(pill::fingerprint(
                 fg.to_string(),
                 key_aliases.get(fg).map(String::as_str),
@@ -318,7 +321,7 @@ pub fn signatures_ready<'a, M: 'static>(
         signers
     ]
     .align_y(Alignment::Center)
-    .spacing(10);
+    .spacing(HSpacing::M);
 
     scrollable::horizontal_thin(ready).into()
 }
@@ -328,12 +331,12 @@ pub fn signatures_missing<'a, M: 'static>() -> Element<'a, M> {
         icon::circle_cross_icon().style(theme::text::error),
         new::caption(t!("psbt-not-ready")).style(theme::text::error)
     ]
-    .spacing(5)
+    .spacing(HSpacing::S)
     .align_y(Alignment::Center)
     .width(Length::Fill);
     row![new::b5_bold(t!("psbt-status")), status]
         .align_y(Alignment::Center)
-        .spacing(20)
+        .spacing(HSpacing::XL)
         .into()
 }
 
@@ -342,7 +345,7 @@ pub fn signatures_requirement<'a, M: 'static>(
 ) -> Element<'a, M> {
     column![new::caption(t!("psbt-finalizing-requires")), requirement]
         .padding(15)
-        .spacing(10)
+        .spacing(VSpacing::S)
         .into()
 }
 
@@ -376,7 +379,9 @@ pub fn spend_header<'a, M: 'static>(
     ]
     .align_y(Alignment::Center);
 
-    column![label, column![spent, fees]].spacing(20).into()
+    column![label, column![spent, fees]]
+        .spacing(VSpacing::L)
+        .into()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -391,7 +396,7 @@ pub fn spend_overview<'a, M: Clone + 'static>(
     action: Option<Element<'a, M>>,
 ) -> Element<'a, M> {
     let export_button = button::btn_export_psbt(saved, export);
-    let buttons = row![export_button, button::btn_import(import)].spacing(5);
+    let buttons = row![export_button, button::btn_import(import)].spacing(HSpacing::S);
     let header = row![new::b5_bold(t!("psbt-title")).width(Length::Fill), buttons]
         .align_y(Alignment::Center);
 
@@ -402,15 +407,15 @@ pub fn spend_overview<'a, M: Clone + 'static>(
     ]
     .align_y(Alignment::Center);
 
-    let psbt = column![header, txid].spacing(10);
+    let psbt = column![header, txid].spacing(VSpacing::S);
     let card = card::foldable::FoldableCard::new(Some(psbt.into()), status, details)
         .padding(card::CardPadding::Soft);
 
     let action = action.map(|action| {
         row![Space::fill_width(), action]
             .align_y(Alignment::Center)
-            .spacing(20)
+            .spacing(HSpacing::XL)
     });
 
-    column![card, action].spacing(20).into()
+    column![card, action].spacing(VSpacing::L).into()
 }
