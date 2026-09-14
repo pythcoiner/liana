@@ -1550,8 +1550,6 @@ psbt-missing-inputs => "Missing information about transaction inputs"
 psbt-more-signatures
 => "{ $count ->\n    [0] no more signatures\n    [one] 1 more signature from\n   *[other] {$count} more signatures from\n}";;
 
-psbt-no-payment => "0 payment"
-
 psbt-not-ready => "Not ready"
 
 psbt-payments => "{ $count ->\n    [one] 1 payment\n   *[other] {$count} payments\n}"
