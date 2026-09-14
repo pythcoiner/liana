@@ -580,88 +580,66 @@ pub fn outputs_view<'a>(
     is_single_payment: bool,
     is_external: bool,
 ) -> Element<'a, Message> {
-    Column::new()
-        .spacing(20)
-        .push({
-            let count = tx
-                .output
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| is_external || !change_indexes.contains(i))
-                .count();
-            if count > 0 {
-                Container::new(
-                    Collapse::new(
-                        Row::new()
-                            .align_y(Alignment::Center)
-                            .push(h4_bold(t!("psbt-payments", count = count)).width(Length::Fill))
-                            .push(icon::collapse_icon()),
-                        Row::new()
-                            .align_y(Alignment::Center)
-                            .push(h4_bold(t!("psbt-payments", count = count)).width(Length::Fill))
-                            .push(icon::collapsed_icon()),
-                        tx.output
-                            .iter()
-                            .enumerate()
-                            .filter(|(i, _)| is_external || !change_indexes.contains(i))
-                            .fold(
-                                Column::new().padding(20),
-                                |col: Column<'a, Message>, (i, output)| {
-                                    col.spacing(10).push(payment_view(
-                                        i,
-                                        tx.compute_txid(),
-                                        output,
-                                        network,
-                                        labels,
-                                        labels_editing,
-                                        is_single_payment,
-                                        !is_external || change_indexes.contains(&i),
-                                    ))
-                                },
-                            ),
-                    )
-                    .padding(20),
+    let is_payment = |i: &usize| is_external || !change_indexes.contains(i);
+    let count = tx
+        .output
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| is_payment(i))
+        .count();
+
+    let payments: Element<'a, Message> = if count > 0 {
+        let title = t!("psbt-payments", count = count);
+        let rows: Column<'a, Message> = tx
+            .output
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| is_payment(i))
+            .map(|(i, output)| {
+                payment_view(
+                    i,
+                    tx.compute_txid(),
+                    output,
+                    network,
+                    labels,
+                    labels_editing,
+                    is_single_payment,
+                    !is_external || change_indexes.contains(&i),
                 )
-            } else {
-                Container::new(h4_bold(t!("psbt-no-payment")).style(|t| {
-                    theme::text::custom(t.colors.buttons.transparent_border.active.text)
-                }))
-                .padding(20)
-                .width(Length::Fill)
-            }
-            .style(theme::card::button_simple)
-        })
-        .push_maybe(if !is_external && !change_indexes.is_empty() {
-            Some(
-                Container::new(
-                    Collapse::new(
-                        Row::new()
-                            .align_y(Alignment::Center)
-                            .push(h4_bold(t!("psbt-change")).width(Length::Fill))
-                            .push(icon::collapse_icon()),
-                        Row::new()
-                            .align_y(Alignment::Center)
-                            .push(h4_bold(t!("psbt-change")).width(Length::Fill))
-                            .push(icon::collapsed_icon()),
-                        tx.output
-                            .iter()
-                            .enumerate()
-                            .filter(|(i, _)| change_indexes.contains(i))
-                            .fold(
-                                Column::new().padding(20),
-                                |col: Column<'a, Message>, (_, output)| {
-                                    col.spacing(10).push(change_view(output, network))
-                                },
-                            ),
-                    )
-                    .padding(20),
-                )
-                .style(theme::card::button_simple),
-            )
-        } else {
-            None
-        })
+            })
+            .collect();
+
+        let header = h4_bold(title).width(Length::Fill);
+        card::foldable::FoldableCard::new(None, header, Some(rows.into()))
+            .padding(20)
+            .into()
+    } else {
+        Container::new(
+            h4_bold(t!("psbt-no-payment"))
+                .style(|t| theme::text::custom(t.colors.buttons.transparent_border.active.text)),
+        )
+        .padding(20)
+        .width(Length::Fill)
+        .style(theme::card::button_simple)
         .into()
+    };
+
+    let change = (!is_external && !change_indexes.is_empty()).then(|| -> Element<'a, Message> {
+        let rows: Column<'a, Message> = tx
+            .output
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| change_indexes.contains(i))
+            .map(|(_, output)| change_view(output, network))
+            .collect();
+
+        let header = h4_bold(t!("psbt-change")).width(Length::Fill);
+        card::foldable::FoldableCard::new(None, header, Some(rows.into()))
+            .padding(20)
+            .into()
+    });
+
+    column![payments, change].spacing(20).into()
 }
 
 fn input_view<'a>(
