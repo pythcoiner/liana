@@ -730,17 +730,21 @@ impl Daemon for BackendWalletClient {
             spend_txs: res
                 .psbts
                 .into_iter()
-                .map(|psbt| ListSpendEntry {
-                    status: spend_status_from_coins(
+                .map(|psbt| {
+                    let status = spend_status_or_from_coins(
+                        psbt.status,
                         &psbt.raw,
                         &psbt_coins(&psbt),
                         &self.wallet_desc,
                         tip_height,
-                    ),
-                    psbt: psbt.raw,
-                    updated_at: Some(psbt.updated_at as u32),
-                    block_height: None,
-                    block_time: None,
+                    );
+                    ListSpendEntry {
+                        status,
+                        psbt: psbt.raw,
+                        updated_at: Some(psbt.updated_at as u32),
+                        block_height: psbt.block_height,
+                        block_time: psbt.block_time,
+                    }
                 })
                 .collect(),
         })
@@ -1298,7 +1302,7 @@ fn spend_tx_from_api(
         }
     }
     labels.insert(txid, value.label);
-    let status = spend_status_from_coins(&value.raw, &coins, desc, tip_height);
+    let status = spend_status_or_from_coins(value.status, &value.raw, &coins, desc, tip_height);
     let mut tx = SpendTx::new(
         Some(value.updated_at as u32),
         value.raw,
