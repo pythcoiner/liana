@@ -20,6 +20,7 @@ use liana::{
     spend::{
         self, create_spend, AddrInfo, AncestorInfo, CandidateCoin, CreateSpendRes,
         SpendCreationError, SpendOutputAddress, SpendTxFees, TxGetter,
+        BITCOIN_CORE_INCREMENTAL_RELAY_FEERATE_VB, MIN_FEERATE_VB,
     },
 };
 
@@ -627,7 +628,7 @@ impl DaemonControl {
         if is_self_send && coins_outpoints.is_empty() {
             return Err(CommandError::NoOutpointForSelfSend);
         }
-        if feerate_vb < 1 {
+        if feerate_vb < MIN_FEERATE_VB {
             return Err(CommandError::InvalidFeerate(feerate_vb));
         }
         let mut db_conn = self.db.connection();
@@ -1007,7 +1008,7 @@ impl DaemonControl {
             .mempool_spenders(&prev_outpoints)
             .into_iter()
             .fold(
-                (1, bitcoin::Amount::from_sat(0)),
+                (MIN_FEERATE_VB, bitcoin::Amount::from_sat(0)),
                 |(min_feerate, descendant_fee), entry| {
                     let entry_feerate = entry
                         .fees
@@ -1015,7 +1016,7 @@ impl DaemonControl {
                         .checked_div(entry.vsize)
                         .expect("Can't have a null vsize or tx would be invalid")
                         .to_sat()
-                        .checked_add(1)
+                        .checked_add(BITCOIN_CORE_INCREMENTAL_RELAY_FEERATE_VB)
                         .expect("Can't overflow or tx would be invalid");
                     (
                         std::cmp::max(min_feerate, entry_feerate),
@@ -1262,7 +1263,7 @@ impl DaemonControl {
         feerate_vb: u64,
         timelock: Option<u16>,
     ) -> Result<CreateRecoveryResult, CommandError> {
-        if feerate_vb < 1 {
+        if feerate_vb < MIN_FEERATE_VB {
             return Err(CommandError::InvalidFeerate(feerate_vb));
         }
         let mut tx_getter = DbTxGetter::new(&self.db);
@@ -2059,7 +2060,7 @@ mod tests {
         let dummy_value = 10_000;
         let mut destinations = <HashMap<bitcoin::Address<address::NetworkUnchecked>, u64>>::new();
         assert_eq!(
-            control.create_spend(&destinations, &[], 1, None),
+            control.create_spend(&destinations, &[], MIN_FEERATE_VB, None),
             Err(CommandError::NoOutpointForSelfSend)
         );
         destinations = [(dummy_addr.clone(), dummy_value)]
@@ -2100,7 +2101,7 @@ mod tests {
             Ok(CreateSpendResult::InsufficientFunds { .. }),
         ));
         let (psbt, warnings) = if let CreateSpendResult::Success { psbt, warnings } = control
-            .create_spend(&destinations, &[dummy_op], 1, None)
+            .create_spend(&destinations, &[dummy_op], MIN_FEERATE_VB, None)
             .unwrap()
         {
             (psbt, warnings)
@@ -2126,7 +2127,7 @@ mod tests {
         // rust-bitcoin's serialization of transactions with no input silently affected our fee
         // calculation.
 
-        // Transaction is 1 in (P2WSH satisfaction), 2 outs. At 1sat/vb, it's 161 sats fees.
+        // Transaction is 1 in (P2WSH satisfaction), 2 outs. At the minimum feerate, it's 161 sats fees.
         // At 2sats/vb, it's twice that.
         assert_eq!(tx.output[1].value.to_sat(), 89_839);
         let psbt = if let CreateSpendResult::Success { psbt, .. } = control
