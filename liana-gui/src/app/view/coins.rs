@@ -10,7 +10,9 @@ use liana_ui::{
         address::address as address_view, amount::amount, badge, button, card, form, pill,
         text::new,
     },
-    icon, theme,
+    icon,
+    spacing::{HSpacing, VSpacing},
+    theme,
     widget::{Column, Container, Element, SpaceExt},
 };
 
@@ -36,24 +38,25 @@ pub fn coins_view<'a>(
 ) -> Element<'a, Message> {
     let title = Container::new(new::d2(Menu::Coins.title())).width(Length::Fill);
 
-    let list = coins
-        .iter()
-        .enumerate()
-        .fold(Column::new().spacing(10), |col, (i, coin)| {
-            col.push(coin_list_view(
-                coin,
-                timelock,
-                cache.blockheight() as u32,
-                i,
-                selected.contains(&i),
-                labels,
-                labels_editing,
-            ))
-        });
+    let list =
+        coins
+            .iter()
+            .enumerate()
+            .fold(Column::new().spacing(VSpacing::S), |col, (i, coin)| {
+                col.push(coin_list_view(
+                    coin,
+                    timelock,
+                    cache.blockheight() as u32,
+                    i,
+                    selected.contains(&i),
+                    labels,
+                    labels_editing,
+                ))
+            });
 
     column![title, list]
         .align_x(Alignment::Center)
-        .spacing(30)
+        .spacing(VSpacing::XXL)
         .into()
 }
 
@@ -81,7 +84,7 @@ fn coin_list_view<'a>(
             // It is not possible to know if a coin is a change coin or not so for now, From is
             // enough
             let from = new::caption(t!("common-from")).style(theme::text::secondary);
-            row![from, new::caption(label)].spacing(5).into()
+            row![from, new::caption(label)].spacing(HSpacing::S).into()
         })
     };
     let label =
@@ -95,12 +98,12 @@ fn coin_list_view<'a>(
         pill::coin_sequence(seq)
     };
     let summary = row![badge::coin(), label, status]
-        .spacing(10)
+        .spacing(HSpacing::M)
         .align_y(Alignment::Center)
         .width(Length::Fill);
     let header = row![summary, amount(&coin.amount)]
         .align_y(Alignment::Center)
-        .spacing(20);
+        .spacing(HSpacing::XL);
 
     let details = {
         let label_editor = if let Some(label) = labels_editing.get(&outpoint) {
@@ -136,14 +139,14 @@ fn coin_list_view<'a>(
             .style(theme::text::secondary)
         ]
         .align_y(Alignment::Center)
-        .spacing(5);
+        .spacing(HSpacing::S);
         let copy_address = button::btn_copy(Some(Message::Clipboard(address.clone())));
         let address = row![
             new::b5_bold(t!("common-address-label")).style(theme::text::secondary),
             row![address_view(address), copy_address].align_y(Alignment::Center)
         ]
         .align_y(Alignment::Center)
-        .spacing(5);
+        .spacing(HSpacing::S);
         let deposit = row![
             new::b5_bold(t!("coins-deposit-transaction-label")).style(theme::text::secondary),
             new::small_caption(
@@ -155,7 +158,7 @@ fn coin_list_view<'a>(
             .style(theme::text::secondary)
         ]
         .align_y(Alignment::Center)
-        .spacing(5);
+        .spacing(HSpacing::S);
         let copy_outpoint = button::btn_copy(Some(Message::Clipboard(outpoint.clone())));
         let outpoint_row = row![
             new::b5_bold(t!("coins-outpoint")).style(theme::text::secondary),
@@ -166,13 +169,13 @@ fn coin_list_view<'a>(
             .align_y(Alignment::Center)
         ]
         .align_y(Alignment::Center)
-        .spacing(5);
+        .spacing(HSpacing::S);
         let block_height = coin.block_height.map(|b| {
             row![
                 new::b5_bold(t!("coins-block-height")).style(theme::text::secondary),
                 new::small_caption(b.to_string()).style(theme::text::secondary)
             ]
-            .spacing(5)
+            .spacing(HSpacing::S)
         });
         let coin_info = column![address_label, address, deposit, outpoint_row, block_height];
 
@@ -182,18 +185,18 @@ fn coin_list_view<'a>(
                     new::b5_bold(t!("coins-spend-txid")).style(theme::text::secondary),
                     new::small_caption(info.txid.to_string())
                 ]
-                .spacing(5);
+                .spacing(HSpacing::S);
                 let spend_height = match info.height {
                     Some(height) => row![
                         new::b5_bold(t!("coins-spend-block-height")).style(theme::text::secondary),
                         new::small_caption(height.to_string())
                     ]
-                    .spacing(5),
+                    .spacing(HSpacing::S),
                     None => {
                         row![new::b5_bold(t!("coins-not-in-block")).style(theme::text::secondary)]
                     }
                 };
-                column![spend_txid, spend_height].spacing(5)
+                column![spend_txid, spend_height].spacing(VSpacing::XS)
             }
             None => {
                 let icon = Some(icon::arrow_repeat());
@@ -210,7 +213,7 @@ fn coin_list_view<'a>(
 
         column![label_editor, recovery, coin_info, spend]
             .padding(10)
-            .spacing(5)
+            .spacing(VSpacing::XS)
     };
 
     card::foldable::FoldableCard::new(None, header, Some(details.into()))
