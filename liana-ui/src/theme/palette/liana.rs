@@ -607,7 +607,7 @@ impl Palette {
                     border: color::RED.into(),
                 },
                 section: ContainerPalette {
-                    background: color::GREY_3,
+                    background: color::GREY_4,
                     text: None,
                     border: Some(color::TRANSPARENT),
                 },
