@@ -569,6 +569,10 @@ mod tests {
         io::{BufRead, BufReader, Write},
         net, path,
         str::FromStr,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
         thread, time,
     };
 
@@ -730,6 +734,22 @@ mod tests {
         stream.flush().unwrap();
     }
 
+    // Tell them the block chain is still syncing, so they don't start polling. The poller may
+    // perform any number of those checks before it processes the shutdown message, so keep
+    // answering until the daemon is stopped.
+    fn complete_sync_checks(server: &net::TcpListener, stopped: &AtomicBool) {
+        let net_resp = "HTTP/1.1 200\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"verificationprogress\":0.1,\"headers\":1000,\"blocks\":100}}\n".as_bytes();
+        loop {
+            let (mut stream, _) = server.accept().unwrap();
+            if stopped.load(Ordering::Relaxed) {
+                return;
+            }
+            read_til_json_end(&mut stream);
+            stream.write_all(net_resp).unwrap();
+            stream.flush().unwrap();
+        }
+    }
+
     // TODO: we could move the dummy bitcoind thread stuff to the bitcoind module to test the
     // bitcoind interface, and use the DummyLiana from testutils to sanity check the startup.
     // Note that startup as checked by this unit test is also tested in the functional test
@@ -792,11 +812,16 @@ mod tests {
         );
 
         // Start the daemon in a new thread so the current one acts as the bitcoind server.
+        let stopped = Arc::new(AtomicBool::new(false));
         let t = thread::spawn({
             let config = config.clone();
+            let stopped = stopped.clone();
             move || {
                 let handle = DaemonHandle::start_default(config, false).unwrap();
                 handle.stop().unwrap();
+                // No request will ever come anymore, unblock the server from its last accept.
+                stopped.store(true, Ordering::Relaxed);
+                net::TcpStream::connect(addr).unwrap();
             }
         });
         complete_sanity_check(&server);
@@ -807,16 +832,20 @@ mod tests {
         complete_wallet_check(&server, &wo_path);
         complete_desc_check(&server, &receive_desc.to_string(), &change_desc.to_string());
         complete_tip_init(&server);
-        // We don't have to complete the sync check as the poller checks whether it needs to stop
-        // before checking the bitcoind sync status.
+        complete_sync_checks(&server, &stopped);
         t.join().unwrap();
 
         // The datadir is created now, so if we restart, it won't create the wo wallet.
+        let stopped = Arc::new(AtomicBool::new(false));
         let t = thread::spawn({
             let config = config.clone();
+            let stopped = stopped.clone();
             move || {
                 let handle = DaemonHandle::start_default(config, false).unwrap();
                 handle.stop().unwrap();
+                // No request will ever come anymore, unblock the server from its last accept.
+                stopped.store(true, Ordering::Relaxed);
+                net::TcpStream::connect(addr).unwrap();
             }
         });
         complete_sanity_check(&server);
@@ -825,8 +854,7 @@ mod tests {
         complete_wallet_loading(&server);
         complete_wallet_check(&server, &wo_path);
         complete_desc_check(&server, &receive_desc.to_string(), &change_desc.to_string());
-        // We don't have to complete the sync check as the poller checks whether it needs to stop
-        // before checking the bitcoind sync status.
+        complete_sync_checks(&server, &stopped);
         t.join().unwrap();
 
         fs::remove_dir_all(&tmp_dir).unwrap();
