@@ -344,6 +344,7 @@ pub struct Input {
 pub struct Psbt {
     pub uuid: String,
     pub txid: Txid,
+    #[serde(default)]
     pub status: SpendStatus,
     pub fee: Option<u64>,
     pub fee_rate: Option<u64>,
@@ -571,6 +572,32 @@ pub mod payload {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn psbt_status_defaults_to_unknown() {
+        let raw = bitcoin::Psbt::from_unsigned_tx(bitcoin::Transaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: bitcoin::absolute::LockTime::ZERO,
+            input: Vec::new(),
+            output: Vec::new(),
+        })
+        .unwrap();
+        let psbt: Psbt = serde_json::from_value(serde_json::json!({
+            "uuid": "uuid",
+            "txid": raw.unsigned_tx.compute_txid(),
+            "fee": null,
+            "fee_rate": null,
+            "label": null,
+            "raw": raw.to_string(),
+            "inputs": [],
+            "outputs": [],
+            "is_batch": false,
+            "updated_at": 0,
+        }))
+        .unwrap();
+
+        assert_eq!(psbt.status, SpendStatus::Unknown);
+    }
 
     #[test]
     fn network_info_feerate_medium_defaults_to_none() {

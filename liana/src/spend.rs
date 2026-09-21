@@ -22,15 +22,70 @@ use miniscript::bitcoin::{
     psbt::{Input as PsbtIn, Output as PsbtOut, Psbt},
     secp256k1,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpendStatus {
-    Pending,
+    Unsigned,
+    Timelocked,
+    Broadcastable,
     Broadcast,
     Confirmed,
     Deprecated,
+    #[default]
+    Unknown,
+}
+
+impl<'de> Deserialize<'de> for SpendStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        Ok(match string.as_str() {
+            "unsigned" => SpendStatus::Unsigned,
+            "timelocked" => SpendStatus::Timelocked,
+            "broadcastable" => SpendStatus::Broadcastable,
+            "broadcast" => SpendStatus::Broadcast,
+            "confirmed" => SpendStatus::Confirmed,
+            "deprecated" => SpendStatus::Deprecated,
+            _ => SpendStatus::Unknown,
+        })
+    }
+}
+
+impl SpendStatus {
+    pub fn from_signatures(
+        sigs: &descriptors::PartialSpendInfo,
+        coins_heights: &[Option<i32>],
+        tip_height: i32,
+    ) -> Self {
+        let is_signed = |path: &descriptors::PathSpendInfo| path.sigs_count >= path.threshold;
+        let primary_signed = is_signed(sigs.primary_path());
+        let recovery_signed = sigs.recovery_paths().values().any(is_signed);
+        match (primary_signed, recovery_signed) {
+            (true, _) => SpendStatus::Broadcastable,
+            (false, false) => SpendStatus::Unsigned,
+            (false, true) => {
+                let timelock = sigs
+                    .recovery_paths()
+                    .iter()
+                    .find(|(_, path)| is_signed(path))
+                    .map(|(timelock, _)| *timelock)
+                    .expect("a signed recovery path exists");
+                let timelock = i32::from(timelock);
+                let available = coins_heights
+                    .iter()
+                    .all(|height| height.is_some_and(|height| tip_height + 1 >= height + timelock));
+                if available {
+                    SpendStatus::Broadcastable
+                } else {
+                    SpendStatus::Timelocked
+                }
+            }
+        }
+    }
 }
 
 /// We would never create a transaction with an output worth less than this.

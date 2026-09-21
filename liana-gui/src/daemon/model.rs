@@ -53,44 +53,80 @@ pub struct SpendTx {
     pub kind: TransactionKind,
 }
 
-/// Status of a spend transaction as it can be told from the coins it spends alone.
-pub fn spend_status_from_coins(psbt: &Psbt, coins: &[Coin]) -> SpendStatus {
+/// Status of a spend transaction as it can be told from the coins it spends and its signatures,
+/// for the transactions the daemon did not give us a status for.
+pub fn spend_status_from_coins(
+    psbt: &Psbt,
+    coins: &[Coin],
+    desc: &LianaDescriptor,
+    tip_height: i32,
+) -> SpendStatus {
     let txid = psbt.unsigned_tx.compute_txid();
-    let mut status = SpendStatus::Pending;
-
+    let mut status = None;
+    let mut coins_heights = Vec::with_capacity(psbt.unsigned_tx.input.len());
     for txin in &psbt.unsigned_tx.input {
         let Some(coin) = coins
             .iter()
             .find(|coin| coin.outpoint == txin.previous_output)
         else {
-            // The coin funding this input is missing
             return SpendStatus::Deprecated;
         };
 
+        coins_heights.push(coin.block_height);
         if let Some(info) = &coin.spend_info {
-            // This tx is spending the coin
             if info.txid == txid {
-                if info.height.is_some() {
-                    status = SpendStatus::Confirmed;
+                status = Some(if info.height.is_some() {
+                    SpendStatus::Confirmed
                 } else {
-                    status = SpendStatus::Broadcast;
-                }
-            // Another confirmed tx has spent the coin
+                    SpendStatus::Broadcast
+                });
             } else if info.height.is_some() {
                 return SpendStatus::Deprecated;
-            } else {
-                // A different unconfirmed transaction is spending the coin. Whether this psbt can
-                // replace it depends on the fees of the mempool entries it would evict, which we
-                // cannot see from the coins alone. Stay optimistic and let the node decide at
-                // broadcast time.
             }
         }
     }
-    status
+
+    if let Some(status) = status {
+        return status;
+    }
+    // Whether this psbt can replace an unconfirmed transaction spending one of its coins depends
+    // on the fees of the mempool entries it would evict, which we cannot see from the coins alone.
+    // Stay optimistic and let the node decide at broadcast time.
+    desc.partial_spend_info(psbt)
+        .map_or(SpendStatus::Unknown, |sigs| {
+            SpendStatus::from_signatures(&sigs, &coins_heights, tip_height)
+        })
+}
+
+/// `Unknown` is the escape hatch for a status this client did not get, from an older daemon, or
+/// does not understand: fall back to what the coins and the signatures tell.
+pub fn spend_status_or_from_coins(
+    status: SpendStatus,
+    psbt: &Psbt,
+    coins: &[Coin],
+    desc: &LianaDescriptor,
+    tip_height: i32,
+) -> SpendStatus {
+    match status {
+        SpendStatus::Unknown => spend_status_from_coins(psbt, coins, desc, tip_height),
+        status => status,
+    }
 }
 
 impl SpendTx {
     pub fn new(
+        updated_at: Option<u32>,
+        psbt: Psbt,
+        coins: Vec<Coin>,
+        desc: &LianaDescriptor,
+        secp: &secp256k1::Secp256k1<impl secp256k1::Verification>,
+        network: Network,
+    ) -> Self {
+        let status = spend_status_from_coins(&psbt, &coins, desc, 0);
+        Self::new_with_status(updated_at, psbt, coins, status, desc, secp, network)
+    }
+
+    pub fn new_with_status(
         updated_at: Option<u32>,
         psbt: Psbt,
         coins: Vec<Coin>,
@@ -199,16 +235,11 @@ impl SpendTx {
         }
     }
 
-    /// Returns the path ready if it exists.
-    pub fn path_ready(&self) -> Option<&PathSpendInfo> {
-        let path = self.sigs.primary_path();
-        if path.sigs_count >= path.threshold {
-            return Some(path);
-        }
-        self.sigs
-            .recovery_paths()
-            .values()
-            .find(|&path| path.sigs_count >= path.threshold)
+    /// Derive the status again from the current signatures and coins, for when this psbt changed
+    /// without asking the daemon.
+    pub fn refresh_status(&mut self, desc: &LianaDescriptor, tip_height: i32) {
+        let coins: Vec<Coin> = self.coins.values().cloned().collect();
+        self.status = spend_status_from_coins(&self.psbt, &coins, desc, tip_height);
     }
 
     pub fn recovery_timelock(&self) -> Option<u16> {
@@ -616,6 +647,10 @@ mod tests {
         }
     }
 
+    fn dummy_desc() -> LianaDescriptor {
+        LianaDescriptor::from_str("wsh(or_d(pk([f5acc2fd]tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T/<0;1>/*),and_v(v:pkh([8a64f2a9]tpubD6NzVbkrYhZ4WmzFjvQrp7sDa4ECUxTi9oby8K4FZkd3XCBtEdKwUiQyYJaxiJo5y42gyDWEczrFpozEjeLxMPxjf2WtkfcbpUdfvNnozWF/<0;1>/*),older(10))))#d72le4dr").unwrap()
+    }
+
     fn psbt_spending(outpoints: &[OutPoint]) -> Psbt {
         Psbt::from_unsigned_tx(Transaction {
             version: transaction::Version::TWO,
@@ -640,16 +675,19 @@ mod tests {
         let second = OutPoint::new(dummy_txid(), 1);
         let unrelated = OutPoint::new(dummy_txid(), 2);
         let psbt = psbt_spending(&[first, second]);
+        let desc = dummy_desc();
 
         assert_eq!(
-            spend_status_from_coins(&psbt, &[dummy_coin(first, None)]),
+            spend_status_from_coins(&psbt, &[dummy_coin(first, None)], &desc, 1),
             SpendStatus::Deprecated
         );
         // An unrelated coin does not stand in for the missing one.
         assert_eq!(
             spend_status_from_coins(
                 &psbt,
-                &[dummy_coin(first, None), dummy_coin(unrelated, None)]
+                &[dummy_coin(first, None), dummy_coin(unrelated, None)],
+                &desc,
+                1
             ),
             SpendStatus::Deprecated
         );
@@ -675,7 +713,7 @@ mod tests {
             ),
         ];
         assert_eq!(
-            spend_status_from_coins(&psbt, &coins),
+            spend_status_from_coins(&psbt, &coins, &dummy_desc(), 1),
             SpendStatus::Broadcast
         );
     }

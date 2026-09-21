@@ -1471,6 +1471,11 @@ pill-spent => "Spent"
 
 pill-spent-tooltip => "The transaction was included in the blockchain."
 
+pill-timelocked => "Timelocked"
+
+pill-timelocked-tooltip
+=> "This recovery transaction is signed but can't be broadcast before its timelock expires";;
+
 pill-to-approve => "To approve"
 
 pill-today => "Today"

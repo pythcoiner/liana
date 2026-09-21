@@ -1156,10 +1156,15 @@ impl SaveSpend {
 }
 
 impl Step for SaveSpend {
-    fn load(&mut self, _coins: &[Coin], _tip_height: i32, draft: &TransactionDraft) {
+    fn load(&mut self, _coins: &[Coin], tip_height: i32, draft: &TransactionDraft) {
         let (psbt, warnings) = draft.generated.clone().unwrap();
-        let status = spend_status_from_coins(&psbt, &draft.inputs);
-        let mut tx = SpendTx::new(
+        let status = spend_status_from_coins(
+            &psbt,
+            &draft.inputs,
+            &self.wallet.main_descriptor,
+            tip_height,
+        );
+        let mut tx = SpendTx::new_with_status(
             None,
             psbt,
             draft.inputs.clone(),

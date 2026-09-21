@@ -1068,12 +1068,19 @@ impl Daemon for BackendWalletClient {
         &self,
         txids: Option<&[Txid]>,
     ) -> Result<Vec<SpendTx>, DaemonError> {
+        let tip_height = self.get_wallet().await?.tip_height.unwrap_or(0);
         let mut spend_txs: Vec<SpendTx> = if let Some(txids) = txids {
             let mut spend_txs = Vec::new();
             if !txids.is_empty() {
                 for chunk in txids.chunks(api::DEFAULT_LIMIT) {
                     for tx in self.list_psbts(chunk).await?.psbts.into_iter().map(|tx| {
-                        spend_tx_from_api(tx, &self.wallet_desc, &self.curve, self.inner.network)
+                        spend_tx_from_api(
+                            tx,
+                            &self.wallet_desc,
+                            &self.curve,
+                            self.inner.network,
+                            tip_height,
+                        )
                     }) {
                         spend_txs.push(tx);
                     }
@@ -1085,7 +1092,15 @@ impl Daemon for BackendWalletClient {
                 .await?
                 .psbts
                 .into_iter()
-                .map(|tx| spend_tx_from_api(tx, &self.wallet_desc, &self.curve, self.inner.network))
+                .map(|tx| {
+                    spend_tx_from_api(
+                        tx,
+                        &self.wallet_desc,
+                        &self.curve,
+                        self.inner.network,
+                        tip_height,
+                    )
+                })
                 .collect()
         };
         spend_txs.sort_by(|a, b| {
@@ -1223,41 +1238,38 @@ fn history_tx_from_api(value: api::Transaction, network: Network) -> HistoryTran
     tx
 }
 
-fn psbt_coins(psbt: &api::Psbt) -> Vec<ListCoinsEntry> {
-    psbt.inputs
-        .iter()
-        .filter(|input| input.kind == UTXOKind::Deposit || input.kind == UTXOKind::Change)
-        .filter_map(|input| input.coin.as_ref())
-        .map(|c| ListCoinsEntry {
-            address: c.address.clone(),
-            amount: c.amount,
-            derivation_index: c.derivation_index,
-            outpoint: c.outpoint,
-            block_height: c.block_height,
-            is_immature: c.is_immature,
-            is_change: c.is_change_address,
-            spend_info: c.spend_info.clone().map(|info| LCSpendInfo {
-                txid: info.txid,
-                height: info.height,
-            }),
-            is_from_self: c.is_from_self,
-        })
-        .collect()
-}
-
 fn spend_tx_from_api(
     value: api::Psbt,
     desc: &LianaDescriptor,
     secp: &secp256k1::Secp256k1<impl secp256k1::Verification>,
     network: Network,
+    tip_height: i32,
 ) -> SpendTx {
     let mut labels = HashMap::<String, Option<String>>::new();
-    let coins = psbt_coins(&value);
+    let mut coins = Vec::new();
     for input in &value.inputs {
         labels.insert(
             format!("{}:{}", input.txid, input.vout),
             input.label.clone(),
         );
+        if input.kind == UTXOKind::Deposit || input.kind == UTXOKind::Change {
+            if let Some(c) = &input.coin {
+                coins.push(ListCoinsEntry {
+                    address: c.address.clone(),
+                    amount: c.amount,
+                    derivation_index: c.derivation_index,
+                    outpoint: c.outpoint,
+                    block_height: c.block_height,
+                    is_immature: c.is_immature,
+                    is_change: c.is_change_address,
+                    spend_info: c.spend_info.clone().map(|info| LCSpendInfo {
+                        txid: info.txid,
+                        height: info.height,
+                    }),
+                    is_from_self: c.is_from_self,
+                });
+            }
+        }
     }
     let mut changes_indexes = Vec::new();
     let txid = value.raw.unsigned_tx.compute_txid().to_string();
@@ -1271,8 +1283,8 @@ fn spend_tx_from_api(
         }
     }
     labels.insert(txid, value.label);
-    let status = spend_status_from_coins(&value.raw, &coins);
-    let mut tx = SpendTx::new(
+    let status = spend_status_or_from_coins(value.status, &value.raw, &coins, desc, tip_height);
+    let mut tx = SpendTx::new_with_status(
         Some(value.updated_at as u32),
         value.raw,
         coins,
