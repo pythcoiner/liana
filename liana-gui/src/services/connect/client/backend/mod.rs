@@ -13,6 +13,7 @@ use liana::{
     miniscript::bitcoin::{
         address, bip32::ChildNumber, psbt::Psbt, Address, Network, OutPoint, Txid,
     },
+    spend::SpendStatus,
 };
 use lianad::{
     bip329::Labels,
@@ -731,6 +732,9 @@ impl Daemon for BackendWalletClient {
                 .map(|psbt| ListSpendEntry {
                     psbt: psbt.raw,
                     updated_at: Some(psbt.updated_at as u32),
+                    status: SpendStatus::Unknown,
+                    block_height: None,
+                    block_time: None,
                 })
                 .collect(),
         })
