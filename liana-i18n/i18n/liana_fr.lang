@@ -123,9 +123,7 @@ btn-previous-arrow => "< Previous" => "< Précédent"
 
 btn-processing => "Processing..." => "Traitement..."
 
-btn-register-on-device
-=> "Register on device"
-=> "Enregistrer sur l'appareil";;
+btn-register-on-device => "Register on device" => "Enregistrer sur l'appareil"
 
 btn-reload => "Reload" => "Recharger"
 
@@ -1215,9 +1213,7 @@ installer-bitcoind-process-exited
 => "bitcoind process exited with status '{$status}'."
 => "Le processus bitcoind s'est terminé avec le statut '{$status}'.";;
 
-installer-build-your-own
-=> "Build your own"
-=> "Configuration sur mesure";;
+installer-build-your-own => "Build your own" => "Configuration sur mesure"
 
 installer-build-your-own-description
 => "Create a custom setup that fits all your needs."
@@ -1387,7 +1383,9 @@ installer-import-descriptor => "Import a descriptor" => "Importer un descriptor"
 
 installer-import-mnemonic => "Import mnemonic" => "Importer une phrase mnémonique"
 
-installer-import-mnemonic-title => "Import Mnemonic" => "Importer une phrase mnémonique"
+installer-import-mnemonic-title
+=> "Import Mnemonic"
+=> "Importer une phrase mnémonique";;
 
 installer-import-wallet-rescan-help
 => "If you are using a Bitcoin Core node, you will need to perform a rescan of the blockchain after creating the wallet in order to see your coins and past transactions. This can be done in Settings > Node."
@@ -1903,7 +1901,9 @@ network-this-is-a => "THIS IS A{ \" \" }" => "CECI EST UN{ \" \" }"
 
 network-wallet => "{$network} WALLET" => "PORTEFEUILLE {$network}"
 
-payment-address-label => "address label: {$label}" => "étiquette d'adresse : {$label}"
+payment-address-label
+=> "address label: {$label}"
+=> "étiquette d'adresse : {$label}";;
 
 payment-incoming => "Incoming payment" => "Paiement entrant"
 
