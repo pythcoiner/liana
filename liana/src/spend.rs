@@ -22,7 +22,71 @@ use miniscript::bitcoin::{
     psbt::{Input as PsbtIn, Output as PsbtOut, Psbt},
     secp256k1,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SpendStatus {
+    Unsigned,
+    Timelocked,
+    Broadcastable,
+    Broadcast,
+    Confirmed,
+    Deprecated,
+    #[default]
+    Unknown,
+}
+
+impl<'de> Deserialize<'de> for SpendStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        Ok(match string.as_str() {
+            "unsigned" => SpendStatus::Unsigned,
+            "timelocked" => SpendStatus::Timelocked,
+            "broadcastable" => SpendStatus::Broadcastable,
+            "broadcast" => SpendStatus::Broadcast,
+            "confirmed" => SpendStatus::Confirmed,
+            "deprecated" => SpendStatus::Deprecated,
+            _ => SpendStatus::Unknown,
+        })
+    }
+}
+
+impl SpendStatus {
+    pub fn from_signatures(
+        sigs: &descriptors::PartialSpendInfo,
+        coins_heights: &[Option<i32>],
+        tip_height: i32,
+    ) -> Self {
+        let is_signed = |path: &descriptors::PathSpendInfo| path.sigs_count >= path.threshold;
+        let primary_signed = is_signed(sigs.primary_path());
+        let recovery_signed = sigs.recovery_paths().values().any(is_signed);
+        match (primary_signed, recovery_signed) {
+            (true, _) => SpendStatus::Broadcastable,
+            (false, false) => SpendStatus::Unsigned,
+            (false, true) => {
+                let timelock = sigs
+                    .recovery_paths()
+                    .iter()
+                    .find(|(_, path)| is_signed(path))
+                    .map(|(timelock, _)| *timelock)
+                    .expect("a signed recovery path exists");
+                let timelock = i32::from(timelock);
+                let available = coins_heights
+                    .iter()
+                    .all(|height| height.is_some_and(|height| tip_height + 1 >= height + timelock));
+                if available {
+                    SpendStatus::Broadcastable
+                } else {
+                    SpendStatus::Timelocked
+                }
+            }
+        }
+    }
+}
 
 /// We would never create a transaction with an output worth less than this.
 /// That's 0.5$ at 100_000$ per BTC.
@@ -37,8 +101,11 @@ pub const LONG_TERM_FEERATE_VB: f32 = 5.0;
 /// Assume that paying more than 1BTC in fee is a bug.
 pub const MAX_FEE: bitcoin::Amount = bitcoin::Amount::ONE_BTC;
 
+pub const MIN_FEERATE_VB: u64 = 1;
+pub const BITCOIN_CORE_INCREMENTAL_RELAY_FEERATE_VB: u64 = 1;
+
 /// Assume that paying more than 1000sat/vb in feerate is a bug.
-pub const MAX_FEERATE: u64 = 1_000;
+pub const MAX_FEERATE_VB: u64 = 1_000;
 
 /// Do not set locktime if tip age in seconds is older than this.
 // See also https://github.com/bitcoin/bitcoin/blob/ecd23656db174adef61d3bd753d02698c3528192/src/wallet/spend.cpp#L906.
@@ -73,7 +140,7 @@ impl fmt::Display for SpendCreationError {
                 "We assume transactions with a fee larger than {} or a feerate larger than {} sats/vb are a mistake. \
                 The created transaction {}.",
                 MAX_FEE,
-                MAX_FEERATE,
+                MAX_FEERATE_VB,
                 match info {
                     InsaneFeeInfo::NegativeFee => "would have a negative fee".to_string(),
                     InsaneFeeInfo::TooHighFee(f) => format!("{f} sats in fees"),
@@ -154,7 +221,7 @@ fn sanity_check_psbt(
         .ok_or(SpendCreationError::InsaneFees(
             InsaneFeeInfo::InvalidFeerate,
         ))?;
-    if !(1..=MAX_FEERATE).contains(&feerate_sats_vb) {
+    if !(MIN_FEERATE_VB..=MAX_FEERATE_VB).contains(&feerate_sats_vb) {
         return Err(SpendCreationError::InsaneFees(
             InsaneFeeInfo::TooHighFeerate(feerate_sats_vb),
         ));
@@ -588,7 +655,7 @@ pub struct CreateSpendRes {
 /// Create a PSBT for a transaction spending some, or all, of `candidate_coins` to `destinations`.
 /// Important information for signers will be populated. Will refuse to create outputs worth less
 /// than `DUST_OUTPUT_SATS`. Will refuse to create a transaction paying more than `MAX_FEE`
-/// satoshis in fees or whose feerate is larger than `MAX_FEERATE` sats/vb.
+/// satoshis in fees or whose feerate is larger than `MAX_FEERATE_VB` sats/vb.
 ///
 /// More about the parameters:
 /// * `main_descriptor`: the multipath Liana descriptor, used to derive the addresses of the
@@ -640,7 +707,7 @@ pub fn create_spend(
         SpendTxFees::Rbf(feerate, fee) => (feerate, Some(fee)),
     };
     let is_self_send = destinations.is_empty();
-    if feerate_vb < 1 {
+    if feerate_vb < MIN_FEERATE_VB {
         return Err(SpendCreationError::InvalidFeerate(feerate_vb));
     }
 

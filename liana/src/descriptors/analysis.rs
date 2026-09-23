@@ -831,6 +831,15 @@ impl PartialSpendInfo {
     pub fn recovery_paths(&self) -> &BTreeMap<u16, PathSpendInfo> {
         &self.recovery_paths
     }
+
+    pub fn signed_path(&self) -> Option<&PathSpendInfo> {
+        if self.primary_path.sigs_count >= self.primary_path.threshold {
+            return Some(&self.primary_path);
+        }
+        self.recovery_paths
+            .values()
+            .find(|&path| path.sigs_count >= path.threshold)
+    }
 }
 
 #[cfg(test)]

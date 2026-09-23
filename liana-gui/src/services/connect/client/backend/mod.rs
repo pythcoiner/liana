@@ -1068,12 +1068,19 @@ impl Daemon for BackendWalletClient {
         &self,
         txids: Option<&[Txid]>,
     ) -> Result<Vec<SpendTx>, DaemonError> {
+        let tip_height = self.get_wallet().await?.tip_height.unwrap_or(0);
         let mut spend_txs: Vec<SpendTx> = if let Some(txids) = txids {
             let mut spend_txs = Vec::new();
             if !txids.is_empty() {
                 for chunk in txids.chunks(api::DEFAULT_LIMIT) {
                     for tx in self.list_psbts(chunk).await?.psbts.into_iter().map(|tx| {
-                        spend_tx_from_api(tx, &self.wallet_desc, &self.curve, self.inner.network)
+                        spend_tx_from_api(
+                            tx,
+                            &self.wallet_desc,
+                            &self.curve,
+                            self.inner.network,
+                            tip_height,
+                        )
                     }) {
                         spend_txs.push(tx);
                     }
@@ -1085,7 +1092,15 @@ impl Daemon for BackendWalletClient {
                 .await?
                 .psbts
                 .into_iter()
-                .map(|tx| spend_tx_from_api(tx, &self.wallet_desc, &self.curve, self.inner.network))
+                .map(|tx| {
+                    spend_tx_from_api(
+                        tx,
+                        &self.wallet_desc,
+                        &self.curve,
+                        self.inner.network,
+                        tip_height,
+                    )
+                })
                 .collect()
         };
         spend_txs.sort_by(|a, b| {
@@ -1228,6 +1243,7 @@ fn spend_tx_from_api(
     desc: &LianaDescriptor,
     secp: &secp256k1::Secp256k1<impl secp256k1::Verification>,
     network: Network,
+    tip_height: i32,
 ) -> SpendTx {
     let mut labels = HashMap::<String, Option<String>>::new();
     let mut coins = Vec::new();
@@ -1267,10 +1283,12 @@ fn spend_tx_from_api(
         }
     }
     labels.insert(txid, value.label);
-    let mut tx = SpendTx::new(
+    let status = spend_status_or_from_coins(value.status, &value.raw, &coins, desc, tip_height);
+    let mut tx = SpendTx::new_with_status(
         Some(value.updated_at as u32),
         value.raw,
         coins,
+        status,
         desc,
         secp,
         network,
