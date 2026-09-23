@@ -291,9 +291,7 @@ business-edit-key => "Edit Key" => "Modifica chiave"
 
 business-edit-primary-path => "Edit Primary Path" => "Modifica opzione primaria"
 
-business-edit-recovery-path
-=> "Edit Recovery Path"
-=> "Modifica opzione di recupero";;
+business-edit-recovery-path => "Edit Recovery Path" => "Modifica opzione di recupero"
 
 business-edited => "Edited" => "Modificato"
 
@@ -1461,7 +1459,9 @@ installer-key-name-help
 => "Give this key a friendly name. It will help you identify it later:"
 => "Dai a questa chiave un nome descrittivo. Ti aiuterà a identificarla più tardi:";;
 
-installer-key-path-account => "Key path account:" => "Account di derivazione della chiave:"
+installer-key-path-account
+=> "Key path account:"
+=> "Account di derivazione della chiave:";;
 
 installer-key-wrong-network
 => "Fetched key does not have the correct network"
